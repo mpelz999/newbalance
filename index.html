@@ -205,9 +205,14 @@
   }
 
   .pair-columns {
-    display: grid;
-    grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr);
+    display: flex;
+    flex-direction: row;
     align-items: stretch;
+  }
+
+  .story-card {
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .story-card:last-child { border-right: none; }
@@ -506,7 +511,7 @@
 
   /* RESPONSIVE */
   @media (max-width: 480px) {
-    .pair-columns { grid-template-columns: 1fr; }
+    
     .story-card { border-right: none; border-bottom: 1px solid var(--border); }
     .story-card:last-child { border-bottom: none; }
     .section-header { grid-template-columns: 1fr auto 1fr; }
@@ -767,11 +772,14 @@ function buildPairs(leftArticles, rightArticles) {
   const pairs = [];
   const usedLeft  = new Set();
   const usedRight = new Set();
-  const TARGET    = 15;
+  const TARGET       = 10;
+  const MAX_PER_TOPIC = 2; // never show more than 2 pairs on same topic
+  const topicCounts  = {};
 
   const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]');
   const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]');
 
+  // PASS 1: Best keyword-matched pairs, capped per topic
   const candidates = [];
   for (let l = 0; l < leftPool.length; l++) {
     for (let r = 0; r < rightPool.length; r++) {
@@ -787,13 +795,16 @@ function buildPairs(leftArticles, rightArticles) {
     const left  = leftPool[c.l];
     const right = rightPool[c.r];
     const topic = classifyArticle(left) !== 'Top Story' ? classifyArticle(left) : classifyArticle(right);
-    const pair  = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
+    if ((topicCounts[topic] || 0) >= MAX_PER_TOPIC) continue; // skip if topic is full
+    const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
     registerPairMeta(pair);
     pairs.push(pair);
     usedLeft.add(c.l);
     usedRight.add(c.r);
+    topicCounts[topic] = (topicCounts[topic] || 0) + 1;
   }
 
+  // PASS 2: Fill remaining slots by topic buckets (one per topic, diverse)
   if (pairs.length < TARGET) {
     const leftByTopic = {}, rightByTopic = {};
     leftPool.forEach((a, i) => {
@@ -806,8 +817,13 @@ function buildPairs(leftArticles, rightArticles) {
       const t = classifyArticle(a);
       (rightByTopic[t] = rightByTopic[t] || []).push({ a, i });
     });
-    for (const topic of Object.keys(leftByTopic)) {
+    // Prioritize topics not yet represented
+    const topicOrder = Object.keys(leftByTopic).sort((a, b) => 
+      (topicCounts[a] || 0) - (topicCounts[b] || 0)
+    );
+    for (const topic of topicOrder) {
       if (pairs.length >= TARGET) break;
+      if ((topicCounts[topic] || 0) >= MAX_PER_TOPIC) continue;
       if (!rightByTopic[topic] || !rightByTopic[topic].length) continue;
       const { a: left, i: li } = leftByTopic[topic].shift();
       const { a: right, i: ri } = rightByTopic[topic].shift();
@@ -816,9 +832,11 @@ function buildPairs(leftArticles, rightArticles) {
       pairs.push(pair);
       usedLeft.add(li);
       usedRight.add(ri);
+      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     }
   }
 
+  // PASS 3: Last resort fill — relax topic cap to 3
   if (pairs.length < TARGET) {
     const remainLeft  = leftPool.filter((_, i) => !usedLeft.has(i));
     const remainRight = rightPool.filter((_, i) => !usedRight.has(i));
@@ -827,9 +845,11 @@ function buildPairs(leftArticles, rightArticles) {
       const left  = remainLeft[i];
       const right = remainRight[i];
       const topic = classifyArticle(left) !== 'Top Story' ? classifyArticle(left) : classifyArticle(right);
-      const pair  = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
+      if ((topicCounts[topic] || 0) >= 3) continue;
+      const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
       registerPairMeta(pair);
       pairs.push(pair);
+      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     }
   }
 
