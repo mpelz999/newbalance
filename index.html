@@ -629,55 +629,207 @@ const SOURCES = {
   ]
 };
 
-// ANGLE CLUSTERS — ordered from most specific to most general.
-// An article's angle = the FIRST cluster whose trigger phrase appears in title+description.
-// Two articles are only paired if they share the EXACT same angle.
-const ANGLE_CLUSTERS = [
-  // ── Specific named events / people ──────────────────────────────────────────
-  { label: 'Khamenei / Iran Leadership',  keys: ['khamenei', 'ayatollah', 'supreme leader'] },
-  { label: 'Iran Retaliation / Missiles', keys: ['iran fires', 'iranian missiles', 'iranian counterattack', 'hormuz', 'retaliation', 'retaliatory strike'] },
-  { label: 'Iran War Powers / Congress',  keys: ['war powers', 'war authority', 'authorization', 'congress.*iran', 'lawmakers.*iran', 'iran.*congress', 'iran.*lawmakers', 'iran.*vote', 'vote.*iran'] },
-  { label: 'Iran World Reaction',         keys: ['world leaders.*iran', 'iran.*world leaders', 'russia.*iran', 'china.*iran', 'un.*iran', 'united nations.*iran', 'security council.*iran', 'condemns.*iran', 'iran.*condemns'] },
-  { label: 'Iran Oil / Economy',          keys: ['iran.*oil', 'oil.*iran', 'iran.*energy', 'strait of hormuz', 'iran.*prices'] },
-  { label: 'Iran Strikes General',        keys: ['iran strike', 'strikes on iran', 'attack on iran', 'iran attack', 'operation epic fury', 'combat operations.*iran', 'iran.*combat'] },
-  // ── Other specific named events ──────────────────────────────────────────────
-  { label: 'Ukraine / Russia',            keys: ['ukraine', 'zelensky', 'russian troops', 'nato.*russia'] },
-  { label: 'Gaza / Israel-Hamas',         keys: ['gaza', 'hamas', 'west bank', 'idf.*palestin', 'palestin.*idf'] },
-  { label: 'RFK / Vaccines / CDC',        keys: ['rfk', 'kennedy.*health', 'vaccine', 'cdc.*vaccine', 'childhood shot'] },
-  { label: 'Immigration / Border',        keys: ['immigr', 'border.*patrol', 'ice agent', 'deportat', 'migrant', 'asylum'] },
-  { label: 'Gun Rights',                  keys: ['gun right', 'second amendment', 'firearms', 'gun control'] },
-  { label: 'AI / Tech',                   keys: ['openai', 'anthropic', 'artificial intelligence', 'chatgpt', 'ai.*education', 'education.*ai'] },
-  { label: 'Supreme Court',               keys: ['supreme court', 'scotus', 'justice.*court', 'court.*justice'] },
-  { label: 'Economy / Tariffs',           keys: ['tariff', 'trade war', 'inflation', 'federal reserve', 'interest rate', 'recession'] },
-  { label: 'Sports',                      keys: ['nba', 'nfl', 'nhl', 'mlb', 'lakers', 'warriors', 'basketball player', 'hockey', 'rugby', 'wrestling', 'mets', 'yankees', 'wrestling'] },
-  { label: 'Crime / Courts',             keys: ['murder', 'charged with', 'cold case', 'death penalty', 'trial', 'verdict', 'convicted', 'mangione', 'epstein'] },
+// ─── TOPIC CLASSIFICATION: HYBRID PERMANENT + DYNAMIC ────────────────────────
+//
+// ARCHITECTURE:
+//   Tier 1 — PERMANENT clusters: broad, evergreen topics that always recur.
+//             These never need updating and catch most routine news.
+//   Tier 2 — DYNAMIC clusters: auto-generated each load from whatever terms
+//             dominate today's actual feed. Catches breaking news automatically
+//             without any manual code changes (new wars, disasters, scandals, etc.)
+//   Tier 3 — KEYWORD OVERLAP fallback: if both articles share 3+ significant
+//             words, they're a candidate pair labeled "Today's News".
+//
+// This means Iran/Khamenei clusters are NOT hardcoded — they emerge automatically
+// from frequency analysis when Iran dominates the feeds.
+
+// ── TIER 1: Permanent broad clusters (evergreen, order = priority) ────────────
+const PERMANENT_CLUSTERS = [
+  // Domestic policy — recurring indefinitely
+  { label: 'Immigration / Deportation',  keys: ['deport', 'ice.*agent', 'ice.*detain', 'undocumented', 'migrant.*detain', 'immigrant.*detain', 'border.*crossing', 'asylum seeker'] },
+  { label: 'Immigration / Border',       keys: ['border.*wall', 'border.*patrol', 'border.*polic', 'immigr.*polic', 'asylum.*polic', 'border.*security'] },
+  { label: 'Vaccines / Public Health',   keys: ['vaccine', 'vaccination', 'measles', 'rfk', 'kennedy.*health', 'cdc.*recommend', 'childhood.*shot', 'herd immunity'] },
+  { label: 'Gun Policy',                 keys: ['gun.*control', 'gun.*right', 'second amendment', 'firearm.*law', 'assault.*weapon', 'background check', 'gun.*legislation'] },
+  { label: 'Abortion / Reproductive',    keys: ['abortion', 'roe.*wade', 'reproductive.*right', 'pro-life', 'pro-choice', 'planned parenthood', 'fetal'] },
+  { label: 'Climate / Energy',           keys: ['climate change', 'global warming', 'fossil fuel', 'renewable energy', 'carbon emission', 'green new deal', 'paris.*accord'] },
+  { label: 'AI / Technology',            keys: ['artificial intelligence', 'openai', 'anthropic', 'chatgpt', 'machine learning', 'deepfake', 'ai.*regulation', 'tech.*giant'] },
+  { label: 'Economy / Tariffs',          keys: ['tariff', 'trade war', 'inflation', 'federal reserve', 'interest rate', 'recession', 'gdp', 'unemployment', 'stock market'] },
+  { label: 'Supreme Court',             keys: ['supreme court', 'scotus', 'high court.*ruling', 'justices.*ruled'] },
+  { label: 'Ukraine / Russia',           keys: ['ukraine', 'zelensky', 'russian.*troops', 'nato.*russia', 'kyiv', 'putin.*ukraine'] },
+  { label: 'Israel / Gaza',              keys: ['gaza', 'hamas', 'west bank', 'palestin', 'idf', 'netanyahu.*gaza', 'ceasefire.*gaza'] },
+  { label: 'China / Taiwan',             keys: ['taiwan.*china', 'china.*taiwan', 'south china sea', 'xi jinping', 'pla.*taiwan', 'beijing.*taiwan'] },
+  { label: 'Healthcare / Medicare',      keys: ['medicaid', 'medicare', 'affordable care', 'obamacare', 'health insurance', 'prescription drug.*cost'] },
+  { label: 'Education Policy',           keys: ['school choice', 'charter school', 'student loan', 'education.*cut', 'dei.*school', 'book.*ban'] },
+  { label: 'Criminal Justice',           keys: ['death penalty', 'prison reform', 'police.*reform', 'crime.*rate', 'mass incarceration', 'mandatory minimum'] },
+  { label: 'Sports',                     keys: ['nba', 'nfl', 'nhl', 'mlb', 'nascar', 'olympics', 'world cup', 'super bowl', 'ncaa', 'march madness'] },
 ];
+
+// ── TIER 2: Dynamic cluster generation from today's feeds ────────────────────
+// Called once per load, returns clusters for whatever is breaking today.
+function buildDynamicClusters(leftArticles, rightArticles) {
+  const STOPWORDS = new Set([
+    'the','a','an','of','in','on','at','to','for','as','with','by','from','after',
+    'into','over','up','out','but','and','or','not','are','is','was','were','be',
+    'been','have','has','had','that','this','its','he','she','they','their','his',
+    'her','how','what','who','why','when','where','which','will','would','could',
+    'should','may','might','than','more','most','new','now','u.s.','says','say',
+    'said','amid','even','still','just','also','after','all','both','first','second',
+    'third','day','days','week','year','years','among','across','against','between',
+    'during','without','within','under','while','though','whether','already','calls',
+    'including','following','shows','leaves','marks','brings','makes','takes','comes',
+    'gets','goes','puts','gives','finds','looks','back','long','live','large','high',
+    'low','last','next','old','young','little','big','same','own','s','t','re','ll',
+    'trump','president','administration','government','officials','white house','federal',
+    'republican','democrat','lawmakers','congress','senate','house','bill','vote',
+    'policy','plan','report','news','update','latest','live','watch','video',
+  ]);
+
+  // Count how often each meaningful word appears across ALL articles (both sides)
+  const wordFreq = {};
+  const bigramFreq = {};
+
+  const allArticles = [...leftArticles, ...rightArticles];
+  for (const article of allArticles) {
+    const text = ((article.title || '') + ' ' + (article.description || '')).toLowerCase();
+    // Remove punctuation
+    const cleaned = text.replace(/['"",.:;!?()\-–—]/g, ' ');
+    const words = cleaned.split(/\s+/).filter(w => w.length > 3 && !STOPWORDS.has(w) && !/^\d+$/.test(w));
+
+    const seen = new Set();
+    for (const w of words) {
+      if (!seen.has(w)) { wordFreq[w] = (wordFreq[w] || 0) + 1; seen.add(w); }
+    }
+    // Bigrams
+    for (let i = 0; i < words.length - 1; i++) {
+      const bg = words[i] + ' ' + words[i+1];
+      if (!seen.has(bg)) { bigramFreq[bg] = (bigramFreq[bg] || 0) + 1; seen.add(bg); }
+    }
+  }
+
+  // Terms that appear in 3+ articles on BOTH sides are "breaking topic" seeds
+  const leftFreq = {};
+  const rightFreq = {};
+  for (const article of leftArticles) {
+    const text = ((article.title || '') + ' ' + (article.description || '')).toLowerCase().replace(/['"",.:;!?()\-–—]/g, ' ');
+    const words = text.split(/\s+/).filter(w => w.length > 3 && !STOPWORDS.has(w));
+    const seen = new Set();
+    for (const w of words) { if (!seen.has(w)) { leftFreq[w] = (leftFreq[w]||0)+1; seen.add(w); } }
+  }
+  for (const article of rightArticles) {
+    const text = ((article.title || '') + ' ' + (article.description || '')).toLowerCase().replace(/['"",.:;!?()\-–—]/g, ' ');
+    const words = text.split(/\s+/).filter(w => w.length > 3 && !STOPWORDS.has(w));
+    const seen = new Set();
+    for (const w of words) { if (!seen.has(w)) { rightFreq[w] = (rightFreq[w]||0)+1; seen.add(w); } }
+  }
+
+  // A term is a "breaking topic seed" if it appears 3+ times total and on both sides
+  const MIN_TOTAL = 3;
+  const seeds = [];
+
+  // Check bigrams first (more specific)
+  for (const [bg, count] of Object.entries(bigramFreq)) {
+    if (count >= MIN_TOTAL) {
+      const [w1, w2] = bg.split(' ');
+      if ((leftFreq[w1] || 0) >= 1 && (rightFreq[w1] || 0) >= 1) {
+        seeds.push({ term: bg, count, isBigram: true });
+      }
+    }
+  }
+  // Then unigrams
+  for (const [word, count] of Object.entries(wordFreq)) {
+    if (count >= MIN_TOTAL && (leftFreq[word]||0) >= 2 && (rightFreq[word]||0) >= 2) {
+      // Skip if already covered by a bigram seed
+      const alreadyCovered = seeds.some(s => s.isBigram && s.term.includes(word));
+      if (!alreadyCovered) seeds.push({ term: word, count, isBigram: false });
+    }
+  }
+
+  // Sort by frequency, take top 8 seeds, generate clusters
+  seeds.sort((a, b) => b.count - a.count);
+  const dynamicClusters = [];
+  const usedTerms = new Set();
+
+  for (const seed of seeds.slice(0, 8)) {
+    // Don't double-cover: skip if a permanent cluster already handles this term
+    const coveredByPermanent = PERMANENT_CLUSTERS.some(c =>
+      c.keys.some(k => new RegExp(k).test(seed.term))
+    );
+    if (coveredByPermanent) continue;
+    if (usedTerms.has(seed.term)) continue;
+    usedTerms.add(seed.term);
+
+    // Label: capitalize each word of bigram, or just the word
+    const label = seed.term.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    dynamicClusters.push({
+      label: `[Breaking] ${label}`,
+      keys: [seed.term],
+      dynamic: true,
+    });
+  }
+
+  return dynamicClusters;
+}
+
+// ── Combined classification ───────────────────────────────────────────────────
+let _dynamicClusters = []; // populated once per feed load
+let _allClusters = PERMANENT_CLUSTERS;
+
+function initClusters(leftArticles, rightArticles) {
+  _dynamicClusters = buildDynamicClusters(leftArticles, rightArticles);
+  _allClusters = [..._dynamicClusters, ...PERMANENT_CLUSTERS];
+}
 
 function classifyArticle(article) {
   const text = ((article.title || '') + ' ' + (article.description || '')).toLowerCase();
-  for (const cluster of ANGLE_CLUSTERS) {
+  for (const cluster of _allClusters) {
     if (cluster.keys.some(k => new RegExp(k).test(text))) return cluster.label;
   }
-  return null; // no angle = skip this article for pairing
+  return null;
+}
+
+// ── TIER 3: Keyword overlap score for unclassified articles ──────────────────
+function keywordOverlapScore(a, b) {
+  const STOPWORDS = new Set(['the','a','an','of','in','on','at','to','for','as','with','by','from',
+    'after','and','or','not','are','is','was','were','that','this','its','he','she','they',
+    'their','says','said','will','would','could','should','may','have','has','had',
+    'trump','president','administration','government','officials',
+  ]);
+  const words = (text) => new Set(
+    text.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/)
+      .filter(w => w.length > 4 && !STOPWORDS.has(w))
+  );
+  const aWords = words((a.title||'') + ' ' + (a.description||''));
+  const bWords = words((b.title||'') + ' ' + (b.description||''));
+  let shared = 0;
+  for (const w of aWords) { if (bWords.has(w)) shared++; }
+  return shared;
 }
 
 function matchScore(a, b) {
   const aAngle = classifyArticle(a);
   const bAngle = classifyArticle(b);
-  // Articles must share the EXACT SAME angle to be paired at all
-  if (!aAngle || !bAngle || aAngle !== bAngle) return 0;
-  // Base score: same angle confirmed
-  let score = 5;
-  // Bonus: shared named entities in the text (same specific people/places)
-  const aText = ((a.title || '') + ' ' + (a.description || '')).toLowerCase();
-  const bText = ((b.title || '') + ' ' + (b.description || '')).toLowerCase();
-  const ENTITIES = ['khamenei','ayatollah','iran','ukraine','russia','israel','gaza','china',
-    'rfk','kennedy','vaccine','congress','senate','fbi','irs','dhs','hegseth','tariff',
-    'medicaid','medicare','border','deportat','openai','anthropic','mangione'];
-  for (const e of ENTITIES) {
-    if (aText.includes(e) && bText.includes(e)) score += 2;
+
+  // CASE 1: Both classified — must share exact same angle
+  if (aAngle && bAngle) {
+    if (aAngle !== bAngle) return 0;
+    // Base score for matching angle
+    let score = 5;
+    // Bonus for shared specific terms (same people/places = tighter match)
+    const aText = ((a.title||'') + ' ' + (a.description||'')).toLowerCase();
+    const bText = ((b.title||'') + ' ' + (b.description||'')).toLowerCase();
+    const overlap = keywordOverlapScore(a, b);
+    score += Math.min(overlap * 2, 10); // up to +10 for shared words
+    return score;
   }
-  return score;
+
+  // CASE 2: Neither classified — use keyword overlap as fallback
+  if (!aAngle && !bAngle) {
+    const overlap = keywordOverlapScore(a, b);
+    return overlap >= 4 ? overlap : 0; // need 4+ shared words to pair unclassified articles
+  }
+
+  // CASE 3: One classified, one not — no match
+  return 0;
 }
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -778,28 +930,27 @@ async function fetchNews() {
 
 // ─── SMART PAIR BUILDER ───────────────────────────────────────────────────────
 function buildPairs(leftArticles, rightArticles) {
+  // Initialize dynamic clusters from today's actual feed content
+  initClusters(leftArticles, rightArticles);
+
   const pairs = [];
   const usedLeft  = new Set();
   const usedRight = new Set();
-  const TARGET        = 15; // show up to 15 pairs for more story diversity
-  const MAX_PER_TOPIC = 2;  // max 2 pairs per specific angle
-  const MAX_IRAN_TOTAL = 2; // hard cap: no more than 2 Iran-related pairs regardless of angle
-  const MIN_SCORE     = 5;  // minimum score = same angle confirmed (angle match returns 5+)
+  const TARGET        = 15; // show up to 15 pairs
+  const MAX_PER_TOPIC = 3;  // max 3 pairs per topic
+  const MIN_SCORE     = 5;
   const topicCounts   = {};
-  let iranPairCount   = 0;
 
-  // Angles that are all part of the Iran war story
-  const IRAN_ANGLES = new Set([
-    'Khamenei / Iran Leadership',
-    'Iran Retaliation / Missiles',
-    'Iran War Powers / Congress',
-    'Iran World Reaction',
-    'Iran Oil / Economy',
-    'Iran Strikes General',
-  ]);
+  // Dynamic topic cap — whatever dominates today's feeds gets capped at 5 pairs
+  // so one event (war, scandal, disaster) can't crowd out everything else.
+  const dominantTopics = new Set(_dynamicClusters.map(c => c.label));
+  const MAX_DOMINANT_TOTAL = 5;
+  let dominantCount = 0;
 
-  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && a.urlToImage && !a.urlToImage.includes('.m3u8') && classifyArticle(a));
-  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && a.urlToImage && !a.urlToImage.includes('.m3u8') && classifyArticle(a));
+  const isValidImage = (url) => url && url !== 'undefined' && url !== 'null' && !url.includes('.m3u8') && url.startsWith('http');
+  // Include all articles with valid images — unclassified ones can still match via keyword overlap (Tier 3)
+  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage));
+  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage));
 
   // PASS 1: High-confidence matched pairs only (score >= MIN_SCORE), capped per topic
   const candidates = [];
@@ -818,17 +969,17 @@ function buildPairs(leftArticles, rightArticles) {
     const right = rightPool[c.r];
     const topic = classifyArticle(left) || classifyArticle(right);
     if ((topicCounts[topic] || 0) >= MAX_PER_TOPIC) continue;
-    if (IRAN_ANGLES.has(topic) && iranPairCount >= MAX_IRAN_TOTAL) continue;
+    if (dominantTopics.has(topic) && dominantCount >= MAX_DOMINANT_TOTAL) continue;
     const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right, score: c.score };
     registerPairMeta(pair);
     pairs.push(pair);
     usedLeft.add(c.l);
     usedRight.add(c.r);
     topicCounts[topic] = (topicCounts[topic] || 0) + 1;
-    if (IRAN_ANGLES.has(topic)) iranPairCount++;
+    if (dominantTopics.has(topic)) dominantCount++;
   }
 
-  // PASS 2: Lower threshold (score >= 1) for remaining slots, diverse topics first
+  // PASS 2: Diverse-topic-first fill — same MIN_SCORE but prioritize underrepresented angles
   if (pairs.length < TARGET) {
     const lowCandidates = [];
     for (let l = 0; l < leftPool.length; l++) {
@@ -842,7 +993,6 @@ function buildPairs(leftArticles, rightArticles) {
         }
       }
     }
-    // Sort by: unrepresented topics first, then score
     lowCandidates.sort((a, b) => {
       const aCnt = topicCounts[a.topic] || 0;
       const bCnt = topicCounts[b.topic] || 0;
@@ -853,7 +1003,7 @@ function buildPairs(leftArticles, rightArticles) {
       if (pairs.length >= TARGET) break;
       if (usedLeft.has(c.l) || usedRight.has(c.r)) continue;
       if ((topicCounts[c.topic] || 0) >= MAX_PER_TOPIC) continue;
-      if (IRAN_ANGLES.has(c.topic) && iranPairCount >= MAX_IRAN_TOTAL) continue;
+      if (dominantTopics.has(c.topic) && dominantCount >= MAX_DOMINANT_TOTAL) continue;
       const left  = leftPool[c.l];
       const right = rightPool[c.r];
       const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic: c.topic, left, right, score: c.score };
@@ -862,7 +1012,37 @@ function buildPairs(leftArticles, rightArticles) {
       usedLeft.add(c.l);
       usedRight.add(c.r);
       topicCounts[c.topic] = (topicCounts[c.topic] || 0) + 1;
-      if (IRAN_ANGLES.has(c.topic)) iranPairCount++;
+      if (dominantTopics.has(c.topic)) dominantCount++;
+    }
+  }
+
+  // PASS 3: Broad Iran fallback — when feeds are Iran-dominated and we're below minimum,
+  // pair any two unused Iran articles together under a generic "Iran War" label.
+  // This ensures at least 10 pairs on major breaking-news days.
+  const MIN_PAIRS = 10;
+  if (pairs.length < MIN_PAIRS) {
+    const isIranArticle = (a) => {
+      const text = ((a.title || '') + ' ' + (a.description || '')).toLowerCase();
+      return /iran|khamenei|ayatollah|operation epic fury|tehran/.test(text);
+    };
+    // Find dominant-topic articles that are still unpaired
+    const domLeftUnused  = leftPool.map((a,i) => ({a,i})).filter(({a,i}) => !usedLeft.has(i)  && dominantTopics.has(classifyArticle(a)));
+    const domRightUnused = rightPool.map((a,i) => ({a,i})).filter(({a,i}) => !usedRight.has(i) && dominantTopics.has(classifyArticle(a)));
+    for (let k = 0; k < Math.min(domLeftUnused.length, domRightUnused.length); k++) {
+      if (pairs.length >= MIN_PAIRS) break;
+      if (dominantCount >= MAX_DOMINANT_TOTAL + 3) break; // absolute ceiling
+      const { a: left, i: li } = domLeftUnused[k];
+      const { a: right, i: ri } = domRightUnused[k];
+      const leftTopic  = classifyArticle(left)  || 'Today\'s News';
+      const rightTopic = classifyArticle(right) || 'Today\'s News';
+      const topic = leftTopic !== rightTopic ? 'Today\'s News' : leftTopic;
+      const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right, score: 5 };
+      registerPairMeta(pair);
+      pairs.push(pair);
+      usedLeft.add(li);
+      usedRight.add(ri);
+      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+      dominantCount++;
     }
   }
 
