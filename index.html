@@ -688,6 +688,8 @@ function buildDynamicClusters(leftArticles, rightArticles) {
     'monday','tuesday','wednesday','thursday','friday','saturday','sunday','today',
     // Generic news words that cluster badly
     'breaking','latest','update','report','watch','video','live','news','story',
+    'about','their','after','other','these','those','there','where','while',
+    'would','could','should','might','which','every','being','going','said',
     'sources','officials','people','world','national','local','states','state',
     'american','americans','united','president','administration','government',
     'republican','democrat','lawmakers','congress','senate','house','white house',
@@ -698,7 +700,8 @@ function buildDynamicClusters(leftArticles, rightArticles) {
     'killed','strikes','attack','attacks','strike','forces','military','troops',
     'leader','leaders','senior','former','new','current','top','key','major',
     // Political figures so ubiquitous they appear in every story — useless as seeds
-    'trump','biden','harris','obama','clinton','reagan',
+    'trump','donald','biden','harris','obama','clinton','reagan',
+    'president','administration','white','house','federal',
     // Countries/topics already covered by permanent clusters — dynamic shouldn't re-invent them
     'iran','iranian','ukraine','ukrainian','russia','russian','israel','israeli',
     'china','chinese','korea','korean','taiwan','taiwanese',
@@ -714,7 +717,7 @@ function buildDynamicClusters(leftArticles, rightArticles) {
       const text = ((article.title || '') + ' ' + (article.description || ''))
         .toLowerCase().replace(/['"",.:;!?()\-–—]/g, ' ');
       const words = text.split(/\s+/).filter(w =>
-        w.length > 4 && !STOPWORDS.has(w) && !/^\d+$/.test(w) && !/^u\.s\.$/.test(w)
+        w.length > 5 && !STOPWORDS.has(w) && !/^\d+$/.test(w) && !/^u\.s\.$/.test(w)
       );
       const seen = new Set();
       for (const w of words) {
@@ -1021,35 +1024,8 @@ function buildPairs(leftArticles, rightArticles) {
     }
   }
 
-  // PASS 3: Broad Iran fallback — when feeds are Iran-dominated and we're below minimum,
-  // pair any two unused Iran articles together under a generic "Iran War" label.
-  // This ensures at least 10 pairs on major breaking-news days.
-  const MIN_PAIRS = 10;
-  if (pairs.length < MIN_PAIRS) {
-    const isIranArticle = (a) => {
-      const text = ((a.title || '') + ' ' + (a.description || '')).toLowerCase();
-      return /iran|khamenei|ayatollah|operation epic fury|tehran/.test(text);
-    };
-    // Find dominant-topic articles that are still unpaired
-    const domLeftUnused  = leftPool.map((a,i) => ({a,i})).filter(({a,i}) => !usedLeft.has(i)  && dynamicLabels.has(classifyArticle(a)));
-    const domRightUnused = rightPool.map((a,i) => ({a,i})).filter(({a,i}) => !usedRight.has(i) && dynamicLabels.has(classifyArticle(a)));
-    for (let k = 0; k < Math.min(domLeftUnused.length, domRightUnused.length); k++) {
-      if (pairs.length >= MIN_PAIRS) break;
-      if (breakingCount >= MAX_BREAKING_TOTAL + 2) break; // absolute ceiling
-      const { a: left, i: li } = domLeftUnused[k];
-      const { a: right, i: ri } = domRightUnused[k];
-      const leftTopic  = classifyArticle(left)  || 'Today\'s News';
-      const rightTopic = classifyArticle(right) || 'Today\'s News';
-      const topic = leftTopic !== rightTopic ? 'Today\'s News' : leftTopic;
-      const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right, score: 5 };
-      registerPairMeta(pair);
-      pairs.push(pair);
-      usedLeft.add(li);
-      usedRight.add(ri);
-      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
-      breakingCount++;
-    }
-  }
+  // No Pass 3 fallback — a bad pair is worse than showing fewer pairs.
+  // On breaking-news days, quality over quantity is the right tradeoff.
 
   // Sort final output: interleave topics so no two same-topic pairs are adjacent
   const sorted = [];
