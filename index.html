@@ -781,10 +781,22 @@ function buildPairs(leftArticles, rightArticles) {
   const pairs = [];
   const usedLeft  = new Set();
   const usedRight = new Set();
-  const TARGET        = 10;
-  const MAX_PER_TOPIC = 2;
-  const MIN_SCORE     = 5; // minimum score = same angle confirmed (angle match returns 5+)
+  const TARGET        = 15; // show up to 15 pairs for more story diversity
+  const MAX_PER_TOPIC = 2;  // max 2 pairs per specific angle
+  const MAX_IRAN_TOTAL = 2; // hard cap: no more than 2 Iran-related pairs regardless of angle
+  const MIN_SCORE     = 5;  // minimum score = same angle confirmed (angle match returns 5+)
   const topicCounts   = {};
+  let iranPairCount   = 0;
+
+  // Angles that are all part of the Iran war story
+  const IRAN_ANGLES = new Set([
+    'Khamenei / Iran Leadership',
+    'Iran Retaliation / Missiles',
+    'Iran War Powers / Congress',
+    'Iran World Reaction',
+    'Iran Oil / Economy',
+    'Iran Strikes General',
+  ]);
 
   const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && a.urlToImage && !a.urlToImage.includes('.m3u8') && classifyArticle(a));
   const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && a.urlToImage && !a.urlToImage.includes('.m3u8') && classifyArticle(a));
@@ -804,14 +816,16 @@ function buildPairs(leftArticles, rightArticles) {
     if (usedLeft.has(c.l) || usedRight.has(c.r)) continue;
     const left  = leftPool[c.l];
     const right = rightPool[c.r];
-    const topic = classifyArticle(left) !== 'Top Story' ? classifyArticle(left) : classifyArticle(right);
+    const topic = classifyArticle(left) || classifyArticle(right);
     if ((topicCounts[topic] || 0) >= MAX_PER_TOPIC) continue;
+    if (IRAN_ANGLES.has(topic) && iranPairCount >= MAX_IRAN_TOTAL) continue;
     const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right, score: c.score };
     registerPairMeta(pair);
     pairs.push(pair);
     usedLeft.add(c.l);
     usedRight.add(c.r);
     topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+    if (IRAN_ANGLES.has(topic)) iranPairCount++;
   }
 
   // PASS 2: Lower threshold (score >= 1) for remaining slots, diverse topics first
@@ -822,9 +836,8 @@ function buildPairs(leftArticles, rightArticles) {
       for (let r = 0; r < rightPool.length; r++) {
         if (usedRight.has(r)) continue;
         const score = matchScore(leftPool[l], rightPool[r]);
-        if (score >= 1) {
-          const topic = classifyArticle(leftPool[l]) !== 'Top Story' 
-            ? classifyArticle(leftPool[l]) : classifyArticle(rightPool[r]);
+        if (score >= MIN_SCORE) {
+          const topic = classifyArticle(leftPool[l]) || classifyArticle(rightPool[r]);
           lowCandidates.push({ l, r, score, topic });
         }
       }
@@ -840,6 +853,7 @@ function buildPairs(leftArticles, rightArticles) {
       if (pairs.length >= TARGET) break;
       if (usedLeft.has(c.l) || usedRight.has(c.r)) continue;
       if ((topicCounts[c.topic] || 0) >= MAX_PER_TOPIC) continue;
+      if (IRAN_ANGLES.has(c.topic) && iranPairCount >= MAX_IRAN_TOTAL) continue;
       const left  = leftPool[c.l];
       const right = rightPool[c.r];
       const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic: c.topic, left, right, score: c.score };
@@ -848,6 +862,7 @@ function buildPairs(leftArticles, rightArticles) {
       usedLeft.add(c.l);
       usedRight.add(c.r);
       topicCounts[c.topic] = (topicCounts[c.topic] || 0) + 1;
+      if (IRAN_ANGLES.has(c.topic)) iranPairCount++;
     }
   }
 
