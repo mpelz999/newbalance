@@ -660,15 +660,41 @@ function extractKeywords(title) {
 }
 
 function matchScore(a, b) {
+  const aText = ((a.title || '') + ' ' + (a.description || '')).toLowerCase();
+  const bText = ((b.title || '') + ' ' + (b.description || '')).toLowerCase();
   const aWords = new Set(extractKeywords(a.title));
   const bWords = new Set(extractKeywords(b.title));
   if (aWords.size === 0 || bWords.size === 0) return 0;
-  let overlap = 0;
-  for (const w of aWords) { if (bWords.has(w)) overlap++; }
+
+  // Count keyword overlap in titles
+  let titleOverlap = 0;
+  for (const w of aWords) { if (bWords.has(w)) titleOverlap++; }
+
+  // Also check description overlap for richer matching
+  const aDescWords = new Set(extractKeywords(a.description || ''));
+  const bDescWords = new Set(extractKeywords(b.description || ''));
+  let descOverlap = 0;
+  for (const w of aDescWords) { if (bDescWords.has(w)) descOverlap++; }
+
+  // Require at least 1 title keyword overlap to be a valid pair
+  if (titleOverlap === 0) return 0;
+
+  // Bonus for same specific sub-topic (named entities)
+  const NAMED_ENTITIES = ['khamenei','iran','ukraine','russia','israel','gaza','china','taiwan',
+    'trump','biden','harris','congress','senate','fbi','irs','dhs','rfk','hegseth',
+    'tariff','medicaid','medicare','vaccine','fentanyl','border','deportat','immigration'];
+  let entityBonus = 0;
+  for (const e of NAMED_ENTITIES) {
+    if (aText.includes(e) && bText.includes(e)) entityBonus += 3;
+  }
+
+  // Penalize if they share a topic cluster but entity overlap is zero
+  // (means they're in same broad area but different specific stories)
   const aCluster = classifyArticle(a);
   const bCluster = classifyArticle(b);
-  const clusterBonus = aCluster === bCluster && aCluster !== 'Top Story' ? 2 : 0;
-  return overlap + clusterBonus;
+  const clusterBonus = aCluster === bCluster && aCluster !== 'Top Story' ? 1 : 0;
+
+  return titleOverlap + (descOverlap * 0.5) + entityBonus + clusterBonus;
 }
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -772,19 +798,20 @@ function buildPairs(leftArticles, rightArticles) {
   const pairs = [];
   const usedLeft  = new Set();
   const usedRight = new Set();
-  const TARGET       = 10;
-  const MAX_PER_TOPIC = 2; // never show more than 2 pairs on same topic
-  const topicCounts  = {};
+  const TARGET        = 10;
+  const MAX_PER_TOPIC = 2;
+  const MIN_SCORE     = 3; // minimum match score to be considered a valid pair
+  const topicCounts   = {};
 
-  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]');
-  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]');
+  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && a.urlToImage && !a.urlToImage.includes('.m3u8'));
+  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && a.urlToImage && !a.urlToImage.includes('.m3u8'));
 
-  // PASS 1: Best keyword-matched pairs, capped per topic
+  // PASS 1: High-confidence matched pairs only (score >= MIN_SCORE), capped per topic
   const candidates = [];
   for (let l = 0; l < leftPool.length; l++) {
     for (let r = 0; r < rightPool.length; r++) {
       const score = matchScore(leftPool[l], rightPool[r]);
-      if (score > 0) candidates.push({ l, r, score });
+      if (score >= MIN_SCORE) candidates.push({ l, r, score });
     }
   }
   candidates.sort((a, b) => b.score - a.score);
@@ -795,8 +822,8 @@ function buildPairs(leftArticles, rightArticles) {
     const left  = leftPool[c.l];
     const right = rightPool[c.r];
     const topic = classifyArticle(left) !== 'Top Story' ? classifyArticle(left) : classifyArticle(right);
-    if ((topicCounts[topic] || 0) >= MAX_PER_TOPIC) continue; // skip if topic is full
-    const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
+    if ((topicCounts[topic] || 0) >= MAX_PER_TOPIC) continue;
+    const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right, score: c.score };
     registerPairMeta(pair);
     pairs.push(pair);
     usedLeft.add(c.l);
@@ -804,56 +831,59 @@ function buildPairs(leftArticles, rightArticles) {
     topicCounts[topic] = (topicCounts[topic] || 0) + 1;
   }
 
-  // PASS 2: Fill remaining slots by topic buckets (one per topic, diverse)
+  // PASS 2: Lower threshold (score >= 1) for remaining slots, diverse topics first
   if (pairs.length < TARGET) {
-    const leftByTopic = {}, rightByTopic = {};
-    leftPool.forEach((a, i) => {
-      if (usedLeft.has(i)) return;
-      const t = classifyArticle(a);
-      (leftByTopic[t] = leftByTopic[t] || []).push({ a, i });
+    const lowCandidates = [];
+    for (let l = 0; l < leftPool.length; l++) {
+      if (usedLeft.has(l)) continue;
+      for (let r = 0; r < rightPool.length; r++) {
+        if (usedRight.has(r)) continue;
+        const score = matchScore(leftPool[l], rightPool[r]);
+        if (score >= 1) {
+          const topic = classifyArticle(leftPool[l]) !== 'Top Story' 
+            ? classifyArticle(leftPool[l]) : classifyArticle(rightPool[r]);
+          lowCandidates.push({ l, r, score, topic });
+        }
+      }
+    }
+    // Sort by: unrepresented topics first, then score
+    lowCandidates.sort((a, b) => {
+      const aCnt = topicCounts[a.topic] || 0;
+      const bCnt = topicCounts[b.topic] || 0;
+      if (aCnt !== bCnt) return aCnt - bCnt;
+      return b.score - a.score;
     });
-    rightPool.forEach((a, i) => {
-      if (usedRight.has(i)) return;
-      const t = classifyArticle(a);
-      (rightByTopic[t] = rightByTopic[t] || []).push({ a, i });
-    });
-    // Prioritize topics not yet represented
-    const topicOrder = Object.keys(leftByTopic).sort((a, b) => 
-      (topicCounts[a] || 0) - (topicCounts[b] || 0)
-    );
-    for (const topic of topicOrder) {
+    for (const c of lowCandidates) {
       if (pairs.length >= TARGET) break;
-      if ((topicCounts[topic] || 0) >= MAX_PER_TOPIC) continue;
-      if (!rightByTopic[topic] || !rightByTopic[topic].length) continue;
-      const { a: left, i: li } = leftByTopic[topic].shift();
-      const { a: right, i: ri } = rightByTopic[topic].shift();
-      const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
+      if (usedLeft.has(c.l) || usedRight.has(c.r)) continue;
+      if ((topicCounts[c.topic] || 0) >= MAX_PER_TOPIC) continue;
+      const left  = leftPool[c.l];
+      const right = rightPool[c.r];
+      const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic: c.topic, left, right, score: c.score };
       registerPairMeta(pair);
       pairs.push(pair);
-      usedLeft.add(li);
-      usedRight.add(ri);
-      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+      usedLeft.add(c.l);
+      usedRight.add(c.r);
+      topicCounts[c.topic] = (topicCounts[c.topic] || 0) + 1;
     }
   }
 
-  // PASS 3: Last resort fill — relax topic cap to 3
-  if (pairs.length < TARGET) {
-    const remainLeft  = leftPool.filter((_, i) => !usedLeft.has(i));
-    const remainRight = rightPool.filter((_, i) => !usedRight.has(i));
-    const fillCount   = Math.min(TARGET - pairs.length, remainLeft.length, remainRight.length);
-    for (let i = 0; i < fillCount; i++) {
-      const left  = remainLeft[i];
-      const right = remainRight[i];
-      const topic = classifyArticle(left) !== 'Top Story' ? classifyArticle(left) : classifyArticle(right);
-      if ((topicCounts[topic] || 0) >= 3) continue;
-      const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
-      registerPairMeta(pair);
-      pairs.push(pair);
-      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
-    }
+  // Sort final output: interleave topics so no two same-topic pairs are adjacent
+  const sorted = [];
+  const byTopic = {};
+  for (const p of pairs) {
+    (byTopic[p.topic] = byTopic[p.topic] || []).push(p);
+  }
+  const topicQueues = Object.values(byTopic);
+  let i = 0;
+  while (sorted.length < pairs.length) {
+    const queue = topicQueues[i % topicQueues.length];
+    if (queue && queue.length > 0) sorted.push(queue.shift());
+    i++;
+    if (topicQueues.every(q => q.length === 0)) break;
   }
 
-  return pairs;
+  return sorted;
 }
 
 // ─── DEMO DATA ────────────────────────────────────────────────────────────────
