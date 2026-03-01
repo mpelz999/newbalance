@@ -206,7 +206,7 @@
 
   .pair-columns {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr);
     align-items: stretch;
   }
 
@@ -505,7 +505,7 @@
   footer a { color: var(--accent); text-decoration: none; }
 
   /* RESPONSIVE */
-  @media (max-width: 640px) {
+  @media (max-width: 480px) {
     .pair-columns { grid-template-columns: 1fr; }
     .story-card { border-right: none; border-bottom: 1px solid var(--border); }
     .story-card:last-child { border-bottom: none; }
