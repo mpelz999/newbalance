@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NewsBalance — Same story. Different framing. You decide.</title>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9843315591248741" crossorigin="anonymous"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --left: #1a4b8c;
+    --left-light: #d6e4f7;
+    --right: #8c1a1a;
+    --right-light: #f7d6d6;
+    --center: #1a1a1a;
+    --bg: #f4f1eb;
+    --paper: #faf8f3;
+    --ink: #1a1a1a;
+    --muted: #7a7468;
+    --border: #d4cfc4;
+    --accent: #c8a84b;
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-body: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    font-family: var(--font-body);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* MASTHEAD */
+  .masthead {
+    background: var(--paper);
+    border-bottom: 2px solid var(--ink);
+    padding: 0;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,.1);
+  }
+
+  .masthead-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 24px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .masthead-logo {
+    font-family: var(--font-display);
+    font-size: clamp(16px, 5vw, 58px);
+    font-weight: 900;
+    letter-spacing: -1px;
+    padding: 14px 12px 10px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .masthead-logo span.blue { color: var(--left); }
+  .masthead-logo span.red { color: var(--right); }
+  .masthead-logo span.pipe { color: var(--border); margin: 0 clamp(3px, 1vw, 12px); }
+
+  .masthead-tagline {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 0 24px 12px;
+  }
+
+  /* MAIN LAYOUT */
+  .main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 20px;
+  }
+
+  .btn-refresh-icon {
+    display: block;
+    margin: 4px auto 0;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 14px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    line-height: 1;
+    transition: all .15s;
+    padding: 0;
+  }
+  .btn-refresh-icon:hover { color: var(--ink); border-color: var(--ink); transform: rotate(30deg); }
+  .btn-refresh-icon:disabled { opacity: .3; cursor: not-allowed; }
+
+  .vs-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 48px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4caf50;
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .4; }
+  }
+
+  /* SECTION HEADER */
+  .section-header {
+    display: grid;
+    grid-template-columns: 1fr 56px 1fr;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 12px;
+  }
+
+  .col-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .col-label.left-label {
+    color: var(--left);
+    border-bottom: 2px solid var(--left);
+  }
+  .col-label.right-label {
+    color: var(--right);
+    border-bottom: 2px solid var(--right);
+    justify-content: flex-end;
+    text-align: right;
+  }
+
+  .vs-badge {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* STORY PAIRS */
+  .pairs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .story-pair {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    animation: slideIn .4s ease both;
+    transition: box-shadow .2s;
+  }
+  .story-pair:hover { box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .pair-topic {
+    background: var(--ink);
+    color: var(--accent);
+    padding: 8px 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .pair-topic .pair-date {
+    color: #666;
+    font-size: 10px;
+  }
+
+  .pair-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .story-card:last-child { border-right: none; }
+
+  .story-card.left-card .story-img,
+  .story-card.left-card .story-img-placeholder {
+    border-top: 3px solid var(--left);
+  }
+  .story-card.right-card .story-img,
+  .story-card.right-card .story-img-placeholder {
+    border-top: 3px solid var(--right);
+  }
+
+  .story-source {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .story-card.left-card .story-source { color: var(--left); }
+  .story-card.right-card .story-source { color: var(--right); }
+
+  .source-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .left-card .source-dot { background: var(--left); }
+  .right-card .source-dot { background: var(--right); }
+
+  .story-img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .story-img-placeholder {
+    width: 100%;
+    height: 180px;
+    background: linear-gradient(135deg, var(--bg) 0%, var(--border) 100%);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .story-img-placeholder .placeholder-icon {
+    font-size: 32px;
+    opacity: 0.4;
+  }
+
+  .story-card {
+    padding: 0;
+    border-right: 1px solid var(--border);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 300px;
+  }
+
+  .story-card-body {
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  .story-headline {
+    font-family: var(--font-display);
+    font-size: clamp(17px, 2.2vw, 23px);
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 10px;
+    color: var(--ink);
+  }
+
+  .story-headline a {
+    color: inherit;
+    text-decoration: none;
+    transition: color .15s;
+  }
+  .story-headline a:hover { color: var(--muted); }
+
+  .story-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 14px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .no-diff-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    gap: 10px;
+  }
+
+  .no-diff-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .vote-btn.center-vote {
+    color: var(--muted);
+    border-color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 20px;
+  }
+  .vote-btn.center-vote:hover, .vote-btn.center-vote.voted {
+    background: var(--muted);
+    color: #fff;
+  }
+  .vote-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .vote-btn {
+    padding: 5px 14px;
+    border: 1px solid currentColor;
+    background: transparent;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .vote-btn.left-vote {
+    color: #fff;
+    background: var(--left);
+    border-color: var(--left);
+  }
+  .vote-btn.left-vote:hover { background: #0f2f5a; border-color: #0f2f5a; }
+  .vote-btn.left-vote.voted { background: #0f2f5a; border-color: #0f2f5a; outline: 2px solid var(--accent); }
+
+  .vote-btn.right-vote {
+    color: #fff;
+    background: var(--right);
+    border-color: var(--right);
+  }
+  .vote-btn.right-vote:hover { background: #5a0f0f; border-color: #5a0f0f; }
+  .vote-btn.right-vote.voted { background: #5a0f0f; border-color: #5a0f0f; outline: 2px solid var(--accent); }
+
+  .vote-btn.center-vote {
+    color: #fff;
+    background: var(--muted);
+    border-color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 20px;
+  }
+  .vote-btn.center-vote:hover { background: #5a5650; border-color: #5a5650; }
+  .vote-btn.center-vote.voted { background: #5a5650; border-color: #5a5650; outline: 2px solid var(--accent); }
+
+  /* AGGREGATE BAR */
+  .agg-bar-wrap {
+    padding: 12px 20px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+
+  .agg-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+
+  .agg-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 0;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .agg-left { background: var(--left); transition: width .4s ease; }
+  .agg-center { background: var(--muted); transition: width .4s ease; }
+  .agg-right { background: var(--right); transition: width .4s ease; }
+
+  .agg-counts {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .agg-counts .cnt-left { color: var(--left); }
+  .agg-counts .cnt-center { color: var(--muted); text-align: center; }
+  .agg-counts .cnt-right { color: var(--right); }
+
+  /* LOADING / EMPTY */
+  .state-msg {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 2;
+  }
+
+  .state-msg .big {
+    font-family: var(--font-display);
+    font-size: 42px;
+    font-weight: 900;
+    color: var(--border);
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ADS */
+  .ad-unit {
+    background: var(--paper);
+    border: 1px dashed var(--border);
+    text-align: center;
+    padding: 4px 4px 2px;
+  }
+  .ad-unit-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--border);
+    display: block;
+    margin-bottom: 2px;
+  }
+  .ad-between {
+    margin: 8px 0;
+  }
+  .ad-footer-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px 24px;
+  }
+  .ad-unit ins { display: block; }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 32px 20px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    margin-top: 48px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  /* RESPONSIVE */
+  @media (max-width: 640px) {
+    .pair-columns { grid-template-columns: 1fr; }
+    .story-card { border-right: none; border-bottom: 1px solid var(--border); }
+    .story-card:last-child { border-bottom: none; }
+    .section-header { grid-template-columns: 1fr auto 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<header class="masthead">
+  <div class="masthead-top">
+    <span id="live-date"></span>
+    <span>Main Street Project — NewsBalance</span>
+    <span id="edition-label"></span>
+  </div>
+  <div class="masthead-logo">
+    <span class="blue">◀ LEFT</span>
+    <span class="pipe">|</span>
+    <span style="letter-spacing:-2px">News<strong>Balance</strong></span>
+    <span class="pipe">|</span>
+    <span class="red">RIGHT ▶</span>
+  </div>
+  <div class="masthead-tagline">Same story. Different framing. You decide.</div>
+</header>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- SECTION HEADER -->
+  <div class="section-header">
+    <div class="col-label left-label">
+      <span>◀</span> Left Perspective
+    </div>
+    <div class="vs-center">
+      <div class="vs-badge">VS</div>
+      <button class="btn-refresh-icon" id="btn-refresh" onclick="fetchNews()" title="Refresh headlines">↻</button>
+    </div>
+    <div class="col-label right-label">
+      Right Perspective <span>▶</span>
+    </div>
+  </div>
+
+  <!-- PAIRS -->
+  <div class="pairs-list" id="pairs-container">
+    <div class="state-msg">
+      <span class="big">⚖</span>
+      Loading headlines…
+    </div>
+  </div>
+
+</main>
+
+<!-- FOOTER AD -->
+<div class="ad-footer-wrap">
+  <div class="ad-unit">
+    <span class="ad-unit-label">Advertisement</span>
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-9843315591248741"
+         data-ad-slot="7426214086"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+</div>
+
+<footer>
+  <a href="https://newsbalance.io">newsbalance.io</a> &nbsp;·&nbsp;
+  Comparing headlines across the political spectrum &nbsp;·&nbsp;
+  A Main Street Project initiative &nbsp;·&nbsp;
+  Updated daily
+</footer>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+
+const SOURCES = {
+  left: [
+    { id: 'cnn',                    label: 'CNN' },
+    { id: 'msnbc',                  label: 'MSNBC' },
+    { id: 'the-huffington-post',    label: 'HuffPost' },
+    { id: 'nbc-news',               label: 'NBC News' },
+    { id: 'the-washington-post',    label: 'Washington Post' },
+    { id: 'the-new-york-times',     label: 'NY Times' },
+    { id: 'associated-press',       label: 'AP News' },
+    { id: 'abc-news',               label: 'ABC News' },
+    { id: 'cbs-news',               label: 'CBS News' },
+    { id: 'politico',               label: 'Politico' },
+    { id: 'the-atlantic',           label: 'The Atlantic' },
+    { id: 'time',                   label: 'TIME' },
+    { id: 'usa-today',              label: 'USA Today' },
+    { id: 'vice-news',              label: 'VICE News' },
+    { id: 'the-verge',              label: 'The Verge' },
+    { id: 'wired',                  label: 'Wired' },
+    { id: 'buzzfeed',               label: 'BuzzFeed' },
+    { id: 'axios',                  label: 'Axios' },
+  ],
+  right: [
+    { id: 'fox-news',               label: 'Fox News' },
+    { id: 'breitbart-news',         label: 'Breitbart' },
+    { id: 'the-hill',               label: 'The Hill' },
+    { id: 'newsweek',               label: 'Newsweek' },
+    { id: 'national-review',        label: 'Nat\'l Review' },
+    { id: 'the-wall-street-journal',label: 'Wall St. Journal' },
+    { id: 'new-york-post',          label: 'NY Post' },
+    { id: 'the-washington-times',   label: 'Washington Times' },
+    { id: 'the-american-conservative', label: 'Am. Conservative' },
+    { id: 'fortune',                label: 'Fortune' },
+    { id: 'business-insider',       label: 'Business Insider' },
+    { id: 'reuters',                label: 'Reuters' },
+    { id: 'bloomberg',              label: 'Bloomberg' },
+    { id: 'the-economist',          label: 'The Economist' },
+    { id: 'independent',            label: 'The Independent' },
+    { id: 'daily-mail',             label: 'Daily Mail' },
+  ]
+};
+
+const TOPIC_CLUSTERS = [
+  { label: 'Politics',       keys: ['trump','biden','harris','congress','senate','house','democrat','republican','gop','white house','election','vote','campaign','oval','administration','president'] },
+  { label: 'Economy',        keys: ['economy','inflation','jobs','gdp','fed','federal reserve','interest rate','unemployment','market','stocks','tariff','trade','deficit','recession','tax','budget','spending'] },
+  { label: 'Immigration',    keys: ['immigr','border','migrant','asylum','deportat','dhs','ice','visa','illegal','refugee','customs'] },
+  { label: 'Foreign Policy', keys: ['ukraine','russia','china','nato','iran','israel','gaza','taiwan','north korea','war','military','troops','sanction','diplomat','foreign','ally','allies','pentagon'] },
+  { label: 'Healthcare',     keys: ['health','covid','drug','medicaid','medicare','insurance','hospital','vaccine','abortion','fda','opioid','mental health','pharmacy'] },
+  { label: 'Education',      keys: ['school','education','student','teacher','college','university','dei','curriculum','loan','tuition','campus'] },
+  { label: 'Energy',         keys: ['energy','oil','gas','climate','green','solar','wind','fossil','epa','carbon','emission','drill','pipeline'] },
+  { label: 'Crime & Justice',keys: ['crime','police','court','supreme court','justice','gun','shooting','fbi','prison','verdict','trial','arrest','law enforcement'] },
+  { label: 'Technology',     keys: ['ai','tech','silicon valley','google','meta','amazon','apple','microsoft','x.com','elon','musk','social media','algorithm','data','privacy'] },
+  { label: 'Social Issues',  keys: ['gender','trans','lgbtq','race','diversity','equity','inclusion','protest','civil rights','homeless','poverty','welfare'] },
+];
+
+function classifyArticle(article) {
+  const text = ((article.title || '') + ' ' + (article.description || '')).toLowerCase();
+  for (const cluster of TOPIC_CLUSTERS) {
+    if (cluster.keys.some(k => text.includes(k))) return cluster.label;
+  }
+  return 'Top Story';
+}
+
+function extractKeywords(title) {
+  if (!title) return [];
+  const STOPWORDS = new Set(['the','a','an','in','on','at','to','for','of','and','or','but','is','was','are','were','be','has','have','had','with','this','that','from','by','as','it','its','not','no','so','we','he','she','they','you','i','will','would','could','should','may','might','about','after','before','over','under','more','new','also','just','says','said','amid']);
+  return title.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !STOPWORDS.has(w));
+}
+
+function matchScore(a, b) {
+  const aWords = new Set(extractKeywords(a.title));
+  const bWords = new Set(extractKeywords(b.title));
+  if (aWords.size === 0 || bWords.size === 0) return 0;
+  let overlap = 0;
+  for (const w of aWords) { if (bWords.has(w)) overlap++; }
+  const aCluster = classifyArticle(a);
+  const bCluster = classifyArticle(b);
+  const clusterBonus = aCluster === bCluster && aCluster !== 'Top Story' ? 2 : 0;
+  return overlap + clusterBonus;
+}
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let activeSources = {
+  left:  new Set(SOURCES.left.map(s => s.id)),
+  right: new Set(SOURCES.right.map(s => s.id)),
+};
+let votes = JSON.parse(localStorage.getItem('newsbalance_votes') || '{}');
+let aggregates = JSON.parse(localStorage.getItem('newsbalance_agg') || '{}');
+
+// ─── DAILY CACHE ─────────────────────────────────────────────────────────────
+function todayKey() {
+  return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10);
+}
+
+function getCachedFeed() {
+  try {
+    const raw = localStorage.getItem(todayKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function setCachedFeed(pairs) {
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('newsbalance_feed_') && k !== todayKey())
+    .forEach(k => localStorage.removeItem(k));
+  localStorage.setItem(todayKey(), JSON.stringify(pairs));
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  document.getElementById('live-date').textContent =
+    now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  document.getElementById('edition-label').textContent =
+    now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' Edition';
+  const cached = getCachedFeed();
+  if (cached && cached.length) {
+    renderPairs(cached);
+  } else {
+    fetchNews();
+  }
+});
+
+let refreshTimer = null;
+function toggleSource(side, id, chip) {
+  if (activeSources[side].has(id)) {
+    if (activeSources[side].size <= 1) return;
+    activeSources[side].delete(id);
+    chip.classList.remove('active');
+  } else {
+    activeSources[side].add(id);
+    chip.classList.add('active');
+  }
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => fetchNews(), 800);
+}
+
+// ─── FETCH NEWS ───────────────────────────────────────────────────────────────
+async function fetchNews() {
+  const btn = document.getElementById('btn-refresh');
+  btn.disabled = true;
+  btn.style.transform = 'rotate(360deg)';
+  btn.style.transition = 'transform 0.6s ease';
+  showLoading();
+
+  try {
+    const res = await fetch('/.netlify/functions/headlines');
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error(data.message || 'Feed error');
+
+    const leftArticles  = data.left  || [];
+    const rightArticles = data.right || [];
+
+    if (leftArticles.length === 0 && rightArticles.length === 0) {
+      throw new Error('No articles returned');
+    }
+
+    const pairs = buildPairs(leftArticles, rightArticles);
+    if (pairs.length === 0) throw new Error('Could not build pairs');
+
+    setCachedFeed(pairs);
+    renderPairs(pairs);
+  } catch(err) {
+    console.warn('Live fetch failed:', err.message, '— falling back to demo.');
+    document.getElementById('pairs-container').innerHTML = `
+      <div class="state-msg">
+        <span class="big">⚠</span>
+        Live feed unavailable.<br>
+        <small>Showing demo stories below.</small>
+      </div>`;
+    setTimeout(() => loadDemo(), 1800);
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { btn.style.transform = ''; btn.style.transition = ''; }, 650);
+  }
+}
+
+// ─── SMART PAIR BUILDER ───────────────────────────────────────────────────────
+function buildPairs(leftArticles, rightArticles) {
+  const pairs = [];
+  const usedLeft  = new Set();
+  const usedRight = new Set();
+  const TARGET    = 15;
+
+  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]');
+  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]');
+
+  const candidates = [];
+  for (let l = 0; l < leftPool.length; l++) {
+    for (let r = 0; r < rightPool.length; r++) {
+      const score = matchScore(leftPool[l], rightPool[r]);
+      if (score > 0) candidates.push({ l, r, score });
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score);
+
+  for (const c of candidates) {
+    if (pairs.length >= TARGET) break;
+    if (usedLeft.has(c.l) || usedRight.has(c.r)) continue;
+    const left  = leftPool[c.l];
+    const right = rightPool[c.r];
+    const topic = classifyArticle(left) !== 'Top Story' ? classifyArticle(left) : classifyArticle(right);
+    const pair  = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
+    registerPairMeta(pair);
+    pairs.push(pair);
+    usedLeft.add(c.l);
+    usedRight.add(c.r);
+  }
+
+  if (pairs.length < TARGET) {
+    const leftByTopic = {}, rightByTopic = {};
+    leftPool.forEach((a, i) => {
+      if (usedLeft.has(i)) return;
+      const t = classifyArticle(a);
+      (leftByTopic[t] = leftByTopic[t] || []).push({ a, i });
+    });
+    rightPool.forEach((a, i) => {
+      if (usedRight.has(i)) return;
+      const t = classifyArticle(a);
+      (rightByTopic[t] = rightByTopic[t] || []).push({ a, i });
+    });
+    for (const topic of Object.keys(leftByTopic)) {
+      if (pairs.length >= TARGET) break;
+      if (!rightByTopic[topic] || !rightByTopic[topic].length) continue;
+      const { a: left, i: li } = leftByTopic[topic].shift();
+      const { a: right, i: ri } = rightByTopic[topic].shift();
+      const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
+      registerPairMeta(pair);
+      pairs.push(pair);
+      usedLeft.add(li);
+      usedRight.add(ri);
+    }
+  }
+
+  if (pairs.length < TARGET) {
+    const remainLeft  = leftPool.filter((_, i) => !usedLeft.has(i));
+    const remainRight = rightPool.filter((_, i) => !usedRight.has(i));
+    const fillCount   = Math.min(TARGET - pairs.length, remainLeft.length, remainRight.length);
+    for (let i = 0; i < fillCount; i++) {
+      const left  = remainLeft[i];
+      const right = remainRight[i];
+      const topic = classifyArticle(left) !== 'Top Story' ? classifyArticle(left) : classifyArticle(right);
+      const pair  = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right };
+      registerPairMeta(pair);
+      pairs.push(pair);
+    }
+  }
+
+  return pairs;
+}
+
+// ─── DEMO DATA ────────────────────────────────────────────────────────────────
+function loadDemo() {
+  const d = (seed) => `https://picsum.photos/seed/${seed}/600/200`;
+  const now = new Date().toISOString();
+  const demoPairs = [
+    { id:'demo_1', topic:'Economy',
+      left:  { source:{name:'CNN'},           title:'Middle-class families still struggling as inflation squeezes budgets', description:'New data shows everyday Americans continue to feel financial strain at the grocery store and gas pump despite cooling headline numbers.', url:'#', publishedAt:now, urlToImage:d('econ1') },
+      right: { source:{name:'Fox News'},       title:'Markets hit record highs as economy shows remarkable resilience', description:'Stock markets soared to new heights this week as investors respond positively to deregulation efforts and historically low unemployment.', url:'#', publishedAt:now, urlToImage:d('econ2') }},
+    { id:'demo_2', topic:'Immigration',
+      left:  { source:{name:'MSNBC'},          title:'Immigrant families torn apart as deportation enforcement escalates across U.S.', description:'Advocates say long-established immigrant communities are being targeted under sweeping new enforcement policies.', url:'#', publishedAt:now, urlToImage:d('immig1') },
+      right: { source:{name:'Breitbart'},       title:'Border officials report record enforcement as rule of law is restored', description:'Agents report historic apprehensions as the administration moves to implement stricter border security and deportation proceedings.', url:'#', publishedAt:now, urlToImage:d('immig2') }},
+    { id:'demo_3', topic:'Healthcare',
+      left:  { source:{name:'HuffPost'},        title:'Millions face losing coverage as GOP targets Medicaid in budget cuts', description:'Health advocates warn Republican budget proposals could strip healthcare from millions of low-income Americans and seniors.', url:'#', publishedAt:now, urlToImage:d('health1') },
+      right: { source:{name:"Nat'l Review"},    title:'Medicaid overhaul aims to cut waste and improve care for the truly needy', description:'Reformers argue restructuring Medicaid will eliminate fraud, boost efficiency and put the program on sustainable footing.', url:'#', publishedAt:now, urlToImage:d('health2') }},
+    { id:'demo_4', topic:'Foreign Policy',
+      left:  { source:{name:'NBC News'},        title:'NATO allies alarmed as U.S. foreign policy shift strains decades-old alliances', description:'European and Asian partners are voicing concern over unpredictable signals from Washington that could reshape global security.', url:'#', publishedAt:now, urlToImage:d('foreign1') },
+      right: { source:{name:'The Hill'},        title:'America-first approach forces allies to finally pull their weight on defense', description:"Analysts say the administration's tough stance is producing results, with NATO partners increasing spending and trade partners offering concessions.", url:'#', publishedAt:now, urlToImage:d('foreign2') }},
+    { id:'demo_5', topic:'Politics',
+      left:  { source:{name:'WaPo'},            title:'Democrats warn democratic norms eroding under current administration', description:'Constitutional scholars and lawmakers raise alarms about executive overreach and weakening of institutional checks and balances.', url:'#', publishedAt:now, urlToImage:d('pol1') },
+      right: { source:{name:'Fox News'},        title:'Republicans say president delivering on mandate to dismantle deep state', description:'Supporters argue the administration is finally fulfilling promises to cut bureaucracy and return power to elected officials.', url:'#', publishedAt:now, urlToImage:d('pol2') }},
+    { id:'demo_6', topic:'Energy',
+      left:  { source:{name:'CNN'},             title:'Scientists warn fossil fuel expansion sets back climate goals by decades', description:'New report finds recent policy reversals on clean energy could lock in dangerous warming for generations to come.', url:'#', publishedAt:now, urlToImage:d('energy1') },
+      right: { source:{name:'Breitbart'},       title:'Energy dominance policy driving down prices and boosting U.S. independence', description:'American energy production hits record highs as administration fast-tracks permits and rolls back Obama-era restrictions.', url:'#', publishedAt:now, urlToImage:d('energy2') }},
+    { id:'demo_7', topic:'Education',
+      left:  { source:{name:'MSNBC'},           title:'Educators fear federal cuts will devastate public schools in low-income areas', description:'Teachers and school administrators warn proposed education budget cuts will widen inequality and harm millions of students.', url:'#', publishedAt:now, urlToImage:d('edu1') },
+      right: { source:{name:'Newsweek'},        title:'School choice expansion gives parents power to escape failing schools', description:'Advocates say education savings accounts and charter expansion are transforming outcomes for families long trapped in underperforming districts.', url:'#', publishedAt:now, urlToImage:d('edu2') }},
+    { id:'demo_8', topic:'Crime & Justice',
+      left:  { source:{name:'NBC News'},        title:'Advocates say new crime bill disproportionately targets minority communities', description:'Civil rights groups argue mandatory minimum provisions in the legislation will exacerbate racial disparities in the criminal justice system.', url:'#', publishedAt:now, urlToImage:d('crime1') },
+      right: { source:{name:'The Hill'},        title:'Tough-on-crime legislation credited with driving down violence in major cities', description:'Law enforcement officials say stronger sentencing guidelines and increased police funding are producing measurable results in urban centers.', url:'#', publishedAt:now, urlToImage:d('crime2') }},
+    { id:'demo_9', topic:'Technology',
+      left:  { source:{name:'WaPo'},            title:'Tech giants face growing calls for regulation as AI risks mount', description:'Researchers and lawmakers say voluntary commitments are insufficient to address bias, misinformation and job displacement from AI systems.', url:'#', publishedAt:now, urlToImage:d('tech1') },
+      right: { source:{name:'Newsweek'},        title:'American AI leadership securing competitive edge over China and rivals', description:'Industry leaders argue excessive regulation would hand strategic technology advantage to adversaries and stifle innovation.', url:'#', publishedAt:now, urlToImage:d('tech2') }},
+    { id:'demo_10', topic:'Social Issues',
+      left:  { source:{name:'HuffPost'},        title:'LGBTQ advocates say new legislation puts vulnerable youth at serious risk', description:'Advocacy groups warn a wave of state and federal restrictions on gender-affirming care will harm mental health outcomes for transgender youth.', url:'#', publishedAt:now, urlToImage:d('social1') },
+      right: { source:{name:"Nat'l Review"},    title:'Parental rights bills protect children from irreversible medical decisions', description:'Supporters argue legislation limiting gender transitions for minors safeguards children until they are mature enough to make permanent choices.', url:'#', publishedAt:now, urlToImage:d('social2') }},
+    { id:'demo_11', topic:'Economy',
+      left:  { source:{name:'CNN'},             title:'Tariff war fears grow as economists warn of price spikes for consumers', description:'Analysts say new import duties risk triggering retaliatory measures that could raise costs for American families on everyday goods.', url:'#', publishedAt:now, urlToImage:d('tariff1') },
+      right: { source:{name:'Fox News'},        title:'Tariffs proving powerful tool to bring manufacturing jobs back to America', description:'Early data shows reshoring momentum building as companies announce new domestic facilities in response to trade policy shifts.', url:'#', publishedAt:now, urlToImage:d('tariff2') }},
+    { id:'demo_12', topic:'Foreign Policy',
+      left:  { source:{name:'NBC News'},        title:'Ukraine aid uncertainty leaves allies questioning U.S. commitment to Europe', description:'Diplomatic sources say wavering American support has emboldened Russia and created a dangerous perception of Western disunity.', url:'#', publishedAt:now, urlToImage:d('ukraine1') },
+      right: { source:{name:'Breitbart'},       title:'U.S. pushes Europe to take primary role in its own defense funding', description:'Officials argue American taxpayers have subsidized European security for too long and the continent must step up with its own resources.', url:'#', publishedAt:now, urlToImage:d('ukraine2') }},
+  ];
+  demoPairs.forEach(p => registerPairMeta(p));
+  renderPairs(demoPairs);
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function showLoading() {
+  document.getElementById('pairs-container').innerHTML =
+    `<div class="state-msg"><span class="spinner"></span> Pulling headlines from left &amp; right sources…</div>`;
+}
+
+function adUnitHTML(slot) {
+  return `
+    <div class="ad-unit ad-between">
+      <span class="ad-unit-label">Advertisement</span>
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-9843315591248741"
+           data-ad-slot="${slot}"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({});<\/script>
+    </div>`;
+}
+
+function renderPairs(pairs) {
+  const container = document.getElementById('pairs-container');
+  if (!pairs.length) {
+    container.innerHTML = '<div class="state-msg"><span class="big">∅</span>No stories found.</div>';
+    return;
+  }
+  container.innerHTML = '';
+  pairs.forEach((pair, i) => {
+    const el = createPairEl(pair, i);
+    container.appendChild(el);
+    if ((i + 1) % 2 === 0 && i < pairs.length - 1) {
+      const adDiv = document.createElement('div');
+      adDiv.innerHTML = adUnitHTML('1535117795');
+      container.appendChild(adDiv.firstElementChild);
+    }
+  });
+}
+
+function createPairEl(pair, idx) {
+  const id  = pair.id;
+  const v   = votes[id] || null;
+  const agg = aggregates[id] || { l:0, c:0, r:0 };
+  const el  = document.createElement('div');
+  el.className = 'story-pair';
+  el.style.animationDelay = `${idx * 80}ms`;
+  el.innerHTML = `
+    <div class="pair-topic">
+      <span>${pair.topic.toUpperCase()}</span>
+      <span class="pair-date">${new Date(pair.left.publishedAt).toLocaleDateString()}</span>
+    </div>
+    <div class="pair-columns">
+      ${cardHTML('left', pair.left, id, v)}
+      ${cardHTML('right', pair.right, id, v)}
+    </div>
+    <div class="no-diff-row">
+      <span class="no-diff-label">Or —</span>
+      <button class="vote-btn center-vote${v === 'center' ? ' voted' : ''}" data-v="center">= No Difference</button>
+    </div>
+    ${aggBarHTML(agg, id)}
+  `;
+  el.querySelectorAll('.vote-btn').forEach(btn => {
+    btn.onclick = () => castVote(id, btn.dataset.v, el);
+  });
+  return el;
+}
+
+function cardHTML(side, article, pairId, currentVote) {
+  const url   = article.url || '#';
+  const title = article.title || 'No headline available';
+  const desc  = article.description || '';
+  const source = article.source?.name || (side === 'left' ? 'Left Source' : 'Right Source');
+  const img   = article.urlToImage || '';
+  const fallbackEmoji = side === 'left' ? '📰' : '🗞️';
+  const fallbackLabel = side === 'left' ? 'Left Source' : 'Right Source';
+  const imageHTML = img
+    ? `<a href="${url}" target="_blank" rel="noopener" style="display:block;line-height:0;">
+         <img class="story-img" src="${img}" alt="" loading="lazy"
+              onerror="this.parentNode.outerHTML='<div class=\\'story-img-placeholder\\'><span class=\\'placeholder-icon\\'>${fallbackEmoji}</span><span>${fallbackLabel}</span></div>'">
+       </a>`
+    : `<div class="story-img-placeholder"><span class="placeholder-icon">${fallbackEmoji}</span><span>${fallbackLabel}</span></div>`;
+  return `
+    <div class="story-card ${side}-card">
+      ${imageHTML}
+      <div class="story-card-body">
+        <div class="story-source"><span class="source-dot"></span>${source}</div>
+        <div class="story-headline"><a href="${url}" target="_blank" rel="noopener">${title}</a></div>
+        ${desc ? `<div class="story-desc">${desc}</div>` : ''}
+        <div class="vote-row">
+          <button class="vote-btn ${side}-vote${currentVote === side ? ' voted' : ''}" data-v="${side}">
+            ${side === 'left' ? '◀' : '▶'} More Balanced
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function aggBarHTML(agg, id) {
+  const total = agg.l + agg.c + agg.r || 1;
+  const lPct  = Math.round(agg.l / total * 100);
+  const cPct  = Math.round(agg.c / total * 100);
+  const rPct  = 100 - lPct - cPct;
+  const totalVotes = agg.l + agg.c + agg.r;
+  return `
+    <div class="agg-bar-wrap" id="agg_${id}">
+      <div class="agg-label-row">
+        <span>Left more balanced (${agg.l})</span>
+        <span>${totalVotes} vote${totalVotes !== 1 ? 's' : ''}</span>
+        <span>Right more balanced (${agg.r})</span>
+      </div>
+      <div class="agg-bar">
+        <div class="agg-left"   style="width:${lPct}%"></div>
+        <div class="agg-center" style="width:${cPct}%"></div>
+        <div class="agg-right"  style="width:${rPct}%"></div>
+      </div>
+      <div class="agg-counts">
+        <span class="cnt-left">${lPct}% Left</span>
+        <span class="cnt-center">${cPct}% No Diff</span>
+        <span class="cnt-right">${rPct}% Right</span>
+      </div>
+    </div>`;
+}
+
+// ─── GOOGLE SHEETS INTEGRATION ───────────────────────────────────────────────
+const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxLkPJMD9jfWCCSq78IlGb2nm00J1Ygl5-ZRcIUyiAbJW2szxYkOSwbqt5lbIMDo8ghIA/exec';
+let pairMetadata = {};
+
+function registerPairMeta(pair) {
+  pairMetadata[pair.id] = {
+    topic:         pair.topic,
+    leftSource:    pair.left.source?.name || '',
+    leftHeadline:  pair.left.title || '',
+    rightSource:   pair.right.source?.name || '',
+    rightHeadline: pair.right.title || '',
+  };
+}
+
+function sendVoteToSheets(pairId, vote, agg) {
+  if (!SHEETS_ENDPOINT || SHEETS_ENDPOINT === 'YOUR_WEB_APP_URL_HERE') return;
+  const meta = pairMetadata[pairId] || {};
+  fetch(SHEETS_ENDPOINT, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pairId, vote, agg, ...meta }),
+  }).catch(() => {});
+}
+
+// ─── VOTING ───────────────────────────────────────────────────────────────────
+function castVote(pairId, vote, pairEl) {
+  const prev = votes[pairId];
+  if (prev === vote) return;
+  if (!aggregates[pairId]) aggregates[pairId] = { l:0, c:0, r:0 };
+  if (prev) {
+    if (prev === 'left')   aggregates[pairId].l = Math.max(0, aggregates[pairId].l - 1);
+    if (prev === 'center') aggregates[pairId].c = Math.max(0, aggregates[pairId].c - 1);
+    if (prev === 'right')  aggregates[pairId].r = Math.max(0, aggregates[pairId].r - 1);
+  }
+  if (vote === 'left')   aggregates[pairId].l++;
+  if (vote === 'center') aggregates[pairId].c++;
+  if (vote === 'right')  aggregates[pairId].r++;
+  votes[pairId] = vote;
+  localStorage.setItem('newsbalance_votes', JSON.stringify(votes));
+  localStorage.setItem('newsbalance_agg',   JSON.stringify(aggregates));
+  sendVoteToSheets(pairId, vote, aggregates[pairId]);
+  pairEl.querySelectorAll('.vote-btn').forEach(btn => {
+    btn.classList.toggle('voted', btn.dataset.v === vote);
+  });
+  const aggWrap = pairEl.querySelector(`#agg_${pairId}`);
+  if (aggWrap) aggWrap.outerHTML = aggBarHTML(aggregates[pairId], pairId);
+}
+</script>
+</body>
+</html>
