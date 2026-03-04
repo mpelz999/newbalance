@@ -650,7 +650,7 @@ const PERMANENT_CLUSTERS = [
   { label: 'Gun Policy',              keys: ['gun.*control', 'gun.*right', 'second amendment', 'firearm.*law', 'assault.*weapon', 'background check', 'gun.*legislation'] },
   { label: 'Climate / Energy',        keys: ['climate change', 'global warming', 'fossil fuel', 'renewable energy', 'carbon emission', 'green new deal', 'paris.*accord', 'epa.*rule'] },
   { label: 'Economy / Tariffs',       keys: ['tariff', 'trade war', 'inflation', 'federal reserve', 'interest rate', 'recession', 'gdp', 'unemployment', 'stock market', 'trade deficit'] },
-  { label: 'Supreme Court',           keys: ['scotus', 'supreme court.*justice', 'supreme court.*ruling', 'supreme court.*case', 'supreme court.*decision', 'u\.s\..*supreme court', 'federal.*supreme court', 'high court.*ruling', 'justices.*ruled', 'gorsuch', 'sotomayor', 'alito', 'kavanaugh', 'barrett', 'jackson.*justice', 'roberts.*court'] },
+  { label: 'Supreme Court',           keys: ['scotus', 'u\.s\. supreme court', 'u\.s\..*supreme court', 'federal.*supreme court', 'high court.*ruling', 'justices.*ruled', 'gorsuch', 'sotomayor', 'alito', 'kavanaugh', 'barrett', 'roberts.*chief', 'jackson.*justice.*court', 'supreme court.*9.*justices', 'nation.*highest court'] },
   { label: 'Healthcare / Medicare',   keys: ['medicaid', 'medicare', 'affordable care', 'obamacare', 'health insurance', 'prescription drug', 'medical debt'] },
   { label: 'AI / Technology',         keys: ['artificial intelligence', 'openai', 'anthropic', 'chatgpt', 'machine learning', 'deepfake', 'ai.*regulation', 'tech.*giant', 'social media.*law'] },
   { label: 'Education Policy',        keys: ['school choice', 'charter school', 'student loan', 'education.*cut', 'dei.*school', 'book.*ban', 'title ix', 'school.*funding'] },
@@ -890,7 +890,10 @@ async function fetchAggregates() {
 
 // ─── DAILY CACHE ─────────────────────────────────────────────────────────────
 function todayKey() {
-  return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10);
+  // Version suffix forces cache bust when pairing logic changes.
+  // Increment CACHE_VERSION whenever algorithm updates are deployed.
+  const CACHE_VERSION = 'v6';
+  return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
 function getCachedFeed() {
@@ -1017,10 +1020,10 @@ function buildPairs(leftArticles, rightArticles) {
 
   // Sports articles excluded — not core to site mission
   const SPORTS_TERMS = ['nba','nfl','nhl','mlb','nascar','super bowl','ncaa','march madness',
-    'lakers','celtics','knicks','warriors','lebron','nfl draft','nba draft','slam dunk',
-    'figure skat','paralympic','winter games','gold medal.*athlet','athlet.*gold medal',
-    'playoffs','world series','stanley cup','nba champion','nfl champion',
-    'box score','point guard','quarterback','touchdown','home run','hat trick'];
+    'lakers','celtics','knicks','warriors','lakers','lebron','nfl draft','nba draft',
+    'slam dunk','figure skat','paralympic','winter games','gold medal','world series',
+    'playoffs','stanley cup','box score','point guard','quarterback','touchdown',
+    'home run','hat trick','slam dunk','world cup final','wimbledon','tour de france'];
   const isSports = (a) => {
     const text = ((a.title || '') + ' ' + (a.description || '')).toLowerCase();
     return SPORTS_TERMS.some(t => text.includes(t));
