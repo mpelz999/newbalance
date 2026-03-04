@@ -650,7 +650,7 @@ const PERMANENT_CLUSTERS = [
   { label: 'Gun Policy',              keys: ['gun.*control', 'gun.*right', 'second amendment', 'firearm.*law', 'assault.*weapon', 'background check', 'gun.*legislation'] },
   { label: 'Climate / Energy',        keys: ['climate change', 'global warming', 'fossil fuel', 'renewable energy', 'carbon emission', 'green new deal', 'paris.*accord', 'epa.*rule'] },
   { label: 'Economy / Tariffs',       keys: ['tariff', 'trade war', 'inflation', 'federal reserve', 'interest rate', 'recession', 'gdp', 'unemployment', 'stock market', 'trade deficit'] },
-  { label: 'Supreme Court',           keys: ['supreme court', 'scotus', 'high court.*ruling', 'justices.*ruled', 'court.*decision.*struck'] },
+  { label: 'Supreme Court',           keys: ['scotus', 'supreme court.*justice', 'supreme court.*ruling', 'supreme court.*case', 'supreme court.*decision', 'u\.s\..*supreme court', 'federal.*supreme court', 'high court.*ruling', 'justices.*ruled', 'gorsuch', 'sotomayor', 'alito', 'kavanaugh', 'barrett', 'jackson.*justice', 'roberts.*court'] },
   { label: 'Healthcare / Medicare',   keys: ['medicaid', 'medicare', 'affordable care', 'obamacare', 'health insurance', 'prescription drug', 'medical debt'] },
   { label: 'AI / Technology',         keys: ['artificial intelligence', 'openai', 'anthropic', 'chatgpt', 'machine learning', 'deepfake', 'ai.*regulation', 'tech.*giant', 'social media.*law'] },
   { label: 'Education Policy',        keys: ['school choice', 'charter school', 'student loan', 'education.*cut', 'dei.*school', 'book.*ban', 'title ix', 'school.*funding'] },
@@ -660,7 +660,7 @@ const PERMANENT_CLUSTERS = [
   { label: 'Mass Shooting',           keys: ['mass shoot', 'mass.*shooting', 'gunman.*killed', 'active shooter', 'multiple.*killed.*shooting', 'shooting.*victims', 'bar.*shooting', 'school.*shooting'] },
   { label: 'Natural Disaster',        keys: ['hurricane', 'tornado', 'earthquake', 'wildfire.*evacuate', 'flood.*damage', 'disaster.*declaration', 'fema.*respond'] },
   { label: 'Senate / House Primary',  keys: ['senate.*primary', 'primary.*senate', 'house.*primary', 'primary.*runoff', 'gop.*primary', 'democratic.*primary', 'primary.*election'] },
-  { label: 'Sports',                  keys: ['nba', 'nfl', 'nhl', 'mlb', 'nascar', 'super bowl', 'ncaa', 'march madness', 'lakers', 'warriors', 'lebron', 'nfl combine', 'gold medal', 'figure skat', 'olympics.*athlet', 'athlet.*olympic', 'winter games', 'paralympic'] },
+  // Sports intentionally excluded — too many cross-sport mismatches, not core to site mission
 ];
 
 // ── TIER 2: Dynamic cluster generation from today's feeds ────────────────────
@@ -709,8 +709,12 @@ function buildDynamicClusters(leftArticles, rightArticles) {
     // Countries/topics already covered by permanent clusters — dynamic shouldn't re-invent them
     'iran','iranian','ukraine','ukrainian','russia','russian','israel','israeli',
     'china','chinese','korea','korean','taiwan','taiwanese',
-    // Other super-generic terms
+    // Election/primary terms — covered by permanent clusters, too broad as dynamic seeds
     'shooting','shooter','killed','election','vote','voting','ballot',
+    'primary','runoff','candidate','senator','governor','congress','republican','democrat',
+    'senate','caucus','polling','results','voters','campaign','nominee',
+    // Sports terms — site intentionally excludes sports content
+    'olympics','athletic','athlete','players','season','league','stadium','coach',
   ]);
 
   // Extract meaningful terms from one set of articles
@@ -833,10 +837,13 @@ function matchScore(a, b) {
   // Both must be classified and share the EXACT same angle
   if (!aAngle || !bAngle || aAngle !== bAngle) return 0;
 
+  const overlap = keywordOverlapScore(a, b);
+
+  // Sports excluded from site — no Sports-specific matching needed
+
   // Base score: same angle = 5
   let score = 5;
   // Bonus for shared specific words (tighter topic match = better pair)
-  const overlap = keywordOverlapScore(a, b);
   score += Math.min(overlap * 2, 10);
   return score;
 }
@@ -978,8 +985,10 @@ function buildPairs(leftArticles, rightArticles) {
   initClusters(leftArticles, rightArticles);
 
   const pairs = [];
-  const usedLeft  = new Set();
-  const usedRight = new Set();
+  const usedLeft     = new Set(); // pool indices
+  const usedRight    = new Set(); // pool indices
+  const usedLeftUrls = new Set(); // article URLs — prevents same article in 2 pairs
+  const usedRightUrls= new Set();
   const TARGET        = 15; // show up to 15 pairs
   const MAX_PER_TOPIC = 3;  // max 3 pairs per topic
   const MIN_SCORE     = 5;
@@ -1005,9 +1014,20 @@ function buildPairs(leftArticles, rightArticles) {
     if (title.split(' ').length <= 3 && desc.includes('plus:')) return true;
     return false;
   };
+
+  // Sports articles excluded — not core to site mission
+  const SPORTS_TERMS = ['nba','nfl','nhl','mlb','nascar','super bowl','ncaa','march madness',
+    'lakers','celtics','knicks','warriors','lebron','nfl draft','nba draft','slam dunk',
+    'figure skat','paralympic','winter games','gold medal.*athlet','athlet.*gold medal',
+    'playoffs','world series','stanley cup','nba champion','nfl champion',
+    'box score','point guard','quarterback','touchdown','home run','hat trick'];
+  const isSports = (a) => {
+    const text = ((a.title || '') + ' ' + (a.description || '')).toLowerCase();
+    return SPORTS_TERMS.some(t => text.includes(t));
+  };
   // Only include articles that can be classified — unclassified articles make bad pairs
-  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a));
-  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a));
+  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a));
+  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a));
 
   // PASS 1: High-confidence matched pairs only (score >= MIN_SCORE), capped per topic
   const candidates = [];
@@ -1024,6 +1044,7 @@ function buildPairs(leftArticles, rightArticles) {
     if (usedLeft.has(c.l) || usedRight.has(c.r)) continue;
     const left  = leftPool[c.l];
     const right = rightPool[c.r];
+    if (usedLeftUrls.has(left.url) || usedRightUrls.has(right.url)) continue;
     const topic = classifyArticle(left) || classifyArticle(right);
     if ((topicCounts[topic] || 0) >= MAX_PER_TOPIC) continue;
     if (dynamicLabels.has(topic) && breakingCount >= MAX_BREAKING_TOTAL) continue;
@@ -1032,6 +1053,8 @@ function buildPairs(leftArticles, rightArticles) {
     pairs.push(pair);
     usedLeft.add(c.l);
     usedRight.add(c.r);
+    usedLeftUrls.add(left.url);
+    usedRightUrls.add(right.url);
     topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     if (dynamicLabels.has(topic)) breakingCount++;
   }
@@ -1059,6 +1082,7 @@ function buildPairs(leftArticles, rightArticles) {
     for (const c of lowCandidates) {
       if (pairs.length >= TARGET) break;
       if (usedLeft.has(c.l) || usedRight.has(c.r)) continue;
+      if (usedLeftUrls.has(leftPool[c.l].url) || usedRightUrls.has(rightPool[c.r].url)) continue;
       if ((topicCounts[c.topic] || 0) >= MAX_PER_TOPIC) continue;
       if (dynamicLabels.has(c.topic) && breakingCount >= MAX_BREAKING_TOTAL) continue;
       const left  = leftPool[c.l];
@@ -1068,6 +1092,8 @@ function buildPairs(leftArticles, rightArticles) {
       pairs.push(pair);
       usedLeft.add(c.l);
       usedRight.add(c.r);
+      usedLeftUrls.add(leftPool[c.l].url);
+      usedRightUrls.add(rightPool[c.r].url);
       topicCounts[c.topic] = (topicCounts[c.topic] || 0) + 1;
       if (dynamicLabels.has(c.topic)) breakingCount++;
     }
