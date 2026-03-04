@@ -410,15 +410,15 @@
     display: flex;
     justify-content: space-between;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
     color: var(--muted);
-    margin-bottom: 5px;
+    margin-bottom: 6px;
   }
 
   .agg-bar {
-    height: 6px;
+    height: 14px;
     background: var(--border);
-    border-radius: 0;
+    border-radius: 3px;
     display: flex;
     overflow: hidden;
   }
@@ -431,8 +431,8 @@
     display: flex;
     justify-content: space-between;
     font-family: var(--font-mono);
-    font-size: 10px;
-    margin-top: 4px;
+    font-size: 11px;
+    margin-top: 6px;
   }
 
   .agg-counts .cnt-left { color: var(--left); }
@@ -654,12 +654,13 @@ const PERMANENT_CLUSTERS = [
   { label: 'Healthcare / Medicare',   keys: ['medicaid', 'medicare', 'affordable care', 'obamacare', 'health insurance', 'prescription drug', 'medical debt'] },
   { label: 'AI / Technology',         keys: ['artificial intelligence', 'openai', 'anthropic', 'chatgpt', 'machine learning', 'deepfake', 'ai.*regulation', 'tech.*giant', 'social media.*law'] },
   { label: 'Education Policy',        keys: ['school choice', 'charter school', 'student loan', 'education.*cut', 'dei.*school', 'book.*ban', 'title ix', 'school.*funding'] },
-  { label: 'Criminal Justice',        keys: ['death penalty', 'prison reform', 'police.*reform', 'mass incarceration', 'mandatory minimum', 'mangione', 'epstein', 'cold case'] },
+  { label: 'Epstein Investigation',    keys: ['epstein', 'jeffrey epstein', 'clinton.*epstein', 'epstein.*clinton', 'epstein.*deposition', 'epstein.*document', 'epstein.*list'] },
+  { label: 'Criminal Justice',        keys: ['death penalty', 'prison reform', 'police.*reform', 'mass incarceration', 'mandatory minimum', 'mangione', 'cold case'] },
   // ── Breaking-but-recurring event types ────────────────────────────────────
   { label: 'Mass Shooting',           keys: ['mass shoot', 'mass.*shooting', 'gunman.*killed', 'active shooter', 'multiple.*killed.*shooting', 'shooting.*victims', 'bar.*shooting', 'school.*shooting'] },
   { label: 'Natural Disaster',        keys: ['hurricane', 'tornado', 'earthquake', 'wildfire.*evacuate', 'flood.*damage', 'disaster.*declaration', 'fema.*respond'] },
   { label: 'Senate / House Primary',  keys: ['senate.*primary', 'primary.*senate', 'house.*primary', 'primary.*runoff', 'gop.*primary', 'democratic.*primary', 'primary.*election'] },
-  { label: 'Sports',                  keys: ['nba', 'nfl', 'nhl', 'mlb', 'nascar', 'olympics', 'world cup', 'super bowl', 'ncaa', 'march madness', 'lakers', 'warriors', 'lebron'] },
+  { label: 'Sports',                  keys: ['nba', 'nfl', 'nhl', 'mlb', 'nascar', 'super bowl', 'ncaa', 'march madness', 'lakers', 'warriors', 'lebron', 'nfl combine', 'gold medal', 'figure skat', 'olympics.*athlet', 'athlet.*olympic', 'winter games', 'paralympic'] },
 ];
 
 // ── TIER 2: Dynamic cluster generation from today's feeds ────────────────────
@@ -690,6 +691,9 @@ function buildDynamicClusters(leftArticles, rightArticles) {
     'breaking','latest','update','report','watch','video','live','news','story',
     'about','their','after','other','these','those','there','where','while',
     'would','could','should','might','which','every','being','going','said',
+    'before','during','inside','behind','across','around','within','almost',
+    // Parts of phrases already in permanent clusters — don't re-seed dynamically
+    'supreme','leadership','strikes','tensions','operations','military',
     'sources','officials','people','world','national','local','states','state',
     'american','americans','united','president','administration','government',
     'republican','democrat','lawmakers','congress','senate','house','white house',
@@ -843,7 +847,39 @@ let activeSources = {
   right: new Set(SOURCES.right.map(s => s.id)),
 };
 let votes = JSON.parse(localStorage.getItem('newsbalance_votes') || '{}');
-let aggregates = JSON.parse(localStorage.getItem('newsbalance_agg') || '{}');
+// aggregates: merged from Sheets (shared) + localStorage (optimistic local updates)
+// Populated on load by fetchAggregates() — starts empty, filled async
+let aggregates = {};
+
+// Fetch shared vote totals from Google Sheets so ALL users see the same counts.
+// Merges server totals with any local votes cast this session.
+async function fetchAggregates() {
+  try {
+    const res = await fetch(SHEETS_ENDPOINT + '?action=getAggregates', {
+      method: 'GET',
+      mode: 'cors',
+    });
+    if (!res.ok) throw new Error('Sheets fetch failed');
+    const data = await res.json();
+    // data is expected: { "pairId": { l, c, r }, ... }
+    if (data && typeof data === 'object') {
+      aggregates = data;
+      // Re-render any already-displayed pair bars with fresh counts
+      document.querySelectorAll('[id^="agg_"]').forEach(el => {
+        const pairId = el.id.replace('agg_', '');
+        if (aggregates[pairId]) {
+          el.outerHTML = aggBarHTML(aggregates[pairId], pairId);
+        }
+      });
+    }
+  } catch(e) {
+    // Sheets unavailable — fall back to localStorage counts silently
+    const local = localStorage.getItem('newsbalance_agg');
+    if (local) {
+      try { aggregates = JSON.parse(local); } catch(_) {}
+    }
+  }
+}
 
 // ─── DAILY CACHE ─────────────────────────────────────────────────────────────
 function todayKey() {
@@ -874,6 +910,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const cached = getCachedFeed();
   if (cached && cached.length) {
     renderPairs(cached);
+    fetchAggregates(); // refresh vote bars with shared counts
   } else {
     fetchNews();
   }
@@ -919,6 +956,7 @@ async function fetchNews() {
 
     setCachedFeed(pairs);
     renderPairs(pairs);
+    fetchAggregates(); // refresh vote bars with shared counts after render
   } catch(err) {
     console.warn('Live fetch failed:', err.message, '— falling back to demo.');
     document.getElementById('pairs-container').innerHTML = `
@@ -956,9 +994,20 @@ function buildPairs(leftArticles, rightArticles) {
   let breakingCount = 0;
 
   const isValidImage = (url) => url && url !== 'undefined' && url !== 'null' && !url.includes('.m3u8') && url.startsWith('http');
+  // Exclude newsletter digests — these are multi-topic roundups that match anything
+  // Detection: title starts with a topic then "Plus:" in description, or very short title
+  const isDigest = (a) => {
+    const title = (a.title || '').toLowerCase();
+    const desc  = (a.description || '').toLowerCase();
+    // Reason-style digest: short topic title + "plus:" in description
+    if (desc.includes('plus:') && desc.includes('...')) return true;
+    // Very short titles that are just a single word/phrase (newsletter subjects)
+    if (title.split(' ').length <= 3 && desc.includes('plus:')) return true;
+    return false;
+  };
   // Only include articles that can be classified — unclassified articles make bad pairs
-  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a));
-  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a));
+  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a));
+  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a));
 
   // PASS 1: High-confidence matched pairs only (score >= MIN_SCORE), capped per topic
   const candidates = [];
@@ -1170,17 +1219,16 @@ function cardHTML(side, article, pairId, currentVote, showImgZone = true) {
   const desc  = article.description || '';
   const source = article.source?.name || (side === 'left' ? 'Left Source' : 'Right Source');
   const img   = article.urlToImage || '';
-  const emoji = side === 'left' ? '📰' : '🗞️';
 
   let imageHTML = '';
   if (showImgZone) {
     if (img) {
       imageHTML = `<a href="${url}" target="_blank" rel="noopener" style="display:block;line-height:0;">
         <img class="story-img" src="${img}" alt="" loading="lazy"
-             onerror="this.parentNode.outerHTML='<div class=\\'story-img-placeholder\\'><span class=\\'placeholder-icon\\'>${emoji}</span><span>${source}</span></div>'">
+             onerror="this.parentNode.outerHTML='<div class=\\'story-img-placeholder\\'><span class=\\'placeholder-icon\\'>📄</span><span>${source}</span></div>'">
       </a>`;
     } else {
-      imageHTML = `<div class="story-img-placeholder"><span class="placeholder-icon">${emoji}</span><span>${source}</span></div>`;
+      imageHTML = `<div class="story-img-placeholder"><span class="placeholder-icon">📄</span><span>${source}</span></div>`;
     }
   }
   return `
@@ -1270,8 +1318,11 @@ function castVote(pairId, vote, pairEl) {
   pairEl.querySelectorAll('.vote-btn').forEach(btn => {
     btn.classList.toggle('voted', btn.dataset.v === vote);
   });
+  // Optimistically render local count immediately
   const aggWrap = pairEl.querySelector(`#agg_${pairId}`);
   if (aggWrap) aggWrap.outerHTML = aggBarHTML(aggregates[pairId], pairId);
+  // Then refresh from Sheets after a short delay to get true shared totals
+  setTimeout(() => fetchAggregates(), 1500);
 }
 </script>
 </body>
