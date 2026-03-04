@@ -211,8 +211,10 @@
   }
 
   .story-card {
-    flex: 1 1 0;
+    flex: 0 0 50%;
+    width: 50%;
     min-width: 0;
+    box-sizing: border-box;
   }
 
   .story-card:last-child { border-right: none; }
@@ -511,10 +513,13 @@
 
   /* RESPONSIVE */
   @media (max-width: 480px) {
-    
     .story-card { border-right: none; border-bottom: 1px solid var(--border); }
     .story-card:last-child { border-bottom: none; }
     .section-header { grid-template-columns: 1fr auto 1fr; }
+    /* On very small screens shrink text so cards still sit side by side */
+    .story-headline { font-size: 14px; }
+    .story-desc { font-size: 12px; }
+    .story-card-body { padding: 10px 12px 14px; }
   }
 </style>
 </head>
@@ -724,9 +729,11 @@ function buildDynamicClusters(leftArticles, rightArticles) {
     for (const article of articles) {
       const text = ((article.title || '') + ' ' + (article.description || ''))
         .toLowerCase().replace(/['"",.:;!?()\-–—]/g, ' ');
-      const words = text.split(/\s+/).filter(w =>
-        w.length > 5 && !STOPWORDS.has(w) && !/^\d+$/.test(w) && !/^u\.s\.$/.test(w)
-      );
+      const words = text.split(/\s+/)
+        .map(w => w.replace(/'s$/, '').replace(/\u2019s$/, '')) // strip possessives
+        .filter(w =>
+          w.length > 5 && !STOPWORDS.has(w) && !/^\d+$/.test(w) && !/^u\.s\.$/.test(w)
+        );
       const seen = new Set();
       for (const w of words) {
         if (!seen.has(w)) { wordFreq[w] = (wordFreq[w] || 0) + 1; seen.add(w); }
@@ -830,20 +837,63 @@ function keywordOverlapScore(a, b) {
   return shared;
 }
 
+// Person tokens that appear across many unrelated stories
+const PERSON_TOKENS = new Set([
+  'hegseth','trump','biden','harris','obama','clinton','pelosi','schumer','mcconnell',
+  'pence','desantis','newsom','abbott','paxton','cornyn','crockett','talarico','menefee',
+  'gonzales','netanyahu','khamenei','putin','zelensky','macron','modi','sunak'
+]);
+
+function keywordOverlapNonPerson(a, b) {
+  const STOP = new Set([
+    'the','a','an','of','in','on','at','to','for','as','with','by','from','and','or',
+    'not','are','is','was','were','be','been','have','has','had','that','this','its',
+    'he','she','they','their','says','said','will','would','could','should','after',
+    'into','over','out','but','also','just','more','new','now','amid','even','still',
+    'within','during','without','already','following','including','trump','president',
+    'administration','government','officials','united','states','american','people',
+    'monday','tuesday','wednesday','thursday','friday','saturday','sunday','today',
+    // Cluster-level words shared by ALL stories in a cluster — not event-specific
+    'iranian','tehran','israel','israeli','russia','russian','ukraine','ukrainian',
+    'primary','runoff','election','senate','congress','military','forces','strike',
+    'strikes','attack','attacks','troops','soldiers','killed','deaths','conflict',
+    'operation','political','republican','democrat','tariffs','economic','border',
+    'immigration','immigrant','eastern','region','warfare',
+  ]);
+  const getWords = (article) => {
+    const text = ((article.title||'') + ' ' + (article.description||''))
+      .toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+    return new Set(text.split(/\s+/).filter(w =>
+      w.length > 5 && !STOP.has(w) && !PERSON_TOKENS.has(w) && !/^\d+$/.test(w)
+    ));
+  };
+  const wa = getWords(a), wb = getWords(b);
+  let count = 0;
+  for (const w of wa) { if (wb.has(w)) count++; }
+  return count;
+}
+
 function matchScore(a, b) {
   const aAngle = classifyArticle(a);
   const bAngle = classifyArticle(b);
 
-  // Both must be classified and share the EXACT same angle
   if (!aAngle || !bAngle || aAngle !== bAngle) return 0;
 
   const overlap = keywordOverlapScore(a, b);
+  const nonPersonOverlap = keywordOverlapNonPerson(a, b);
 
-  // Sports excluded from site — no Sports-specific matching needed
+  // Permanent high-volume clusters fire on many different sub-events each day.
+  // Require 1+ shared non-person, non-cluster event keyword to prevent cross-event pairs:
+  //   - Gonzales House race paired with Cornyn/Paxton Senate race (both 'Primary')
+  //   - Girls school strike paired with submarine sinking (both 'Iran War')
+  // Dynamic/breaking clusters (e.g. [BREAKING] PENTAGON) are already specific — skip check.
+  const HIGH_VOLUME = new Set([
+    'Iran / Middle East War', 'Senate / House Primary', 'Ukraine / Russia',
+    'Israel / Gaza', 'Immigration / Deportation', 'Economy / Tariffs'
+  ]);
+  if (HIGH_VOLUME.has(aAngle) && nonPersonOverlap < 1) return 0;
 
-  // Base score: same angle = 5
   let score = 5;
-  // Bonus for shared specific words (tighter topic match = better pair)
   score += Math.min(overlap * 2, 10);
   return score;
 }
@@ -892,7 +942,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v6';
+  const CACHE_VERSION = 'v7';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
