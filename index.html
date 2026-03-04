@@ -942,7 +942,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v7';
+  const CACHE_VERSION = 'v8';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1061,10 +1061,16 @@ function buildPairs(leftArticles, rightArticles) {
   const isDigest = (a) => {
     const title = (a.title || '').toLowerCase();
     const desc  = (a.description || '').toLowerCase();
-    // Reason-style digest: short topic title + "plus:" in description
+    // Reason-style newsletter digest: short topic title + "plus:" in description
     if (desc.includes('plus:') && desc.includes('...')) return true;
-    // Very short titles that are just a single word/phrase (newsletter subjects)
     if (title.split(' ').length <= 3 && desc.includes('plus:')) return true;
+    // Broad roundup articles: description lists 4+ names separated by commas/and
+    // e.g. "Crenshaw losing and Reps. Al Green, Menefee, Johnson and Foushee in tight races"
+    // These pair weakly because they match any story in the cluster
+    const nameCount = (desc.match(/reps?\.?\s+[A-Z]|sen\.?\s+[A-Z]|rep\.?\s+[A-Z]/gi) || []).length;
+    if (nameCount >= 3) return true;
+    // Explicit roundup language
+    if (/\b(roundup|takeaways|wrap-?up|recap|what (to|you) know|everything (to|you) need)\b/.test(title)) return true;
     return false;
   };
 
