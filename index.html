@@ -208,13 +208,24 @@
     display: flex;
     flex-direction: row;
     align-items: stretch;
+    overflow: hidden;
+    width: 100%;
   }
 
   .story-card {
     flex: 0 0 50%;
     width: 50%;
     min-width: 0;
+    max-width: 50%;
     box-sizing: border-box;
+    padding: 0;
+    border-right: 1px solid var(--border);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 300px;
+    word-break: break-word;
   }
 
   .story-card:last-child { border-right: none; }
@@ -281,15 +292,7 @@
     opacity: 0.4;
   }
 
-  .story-card {
-    padding: 0;
-    border-right: 1px solid var(--border);
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-height: 300px;
-  }
+
 
   .story-card-body {
     padding: 16px 20px 20px;
@@ -859,6 +862,9 @@ function keywordOverlapNonPerson(a, b) {
     'strikes','attack','attacks','troops','soldiers','killed','deaths','conflict',
     'operation','political','republican','democrat','tariffs','economic','border',
     'immigration','immigrant','eastern','region','warfare',
+    // Title/role words — shared whenever the same official is mentioned across stories
+    'secretary','defense','pentagon','minister','official','officials','chairman',
+    'general','director','department','nuclear','weapons','missile','missiles',
   ]);
   const getWords = (article) => {
     const text = ((article.title||'') + ' ' + (article.description||''))
@@ -942,7 +948,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v8';
+  const CACHE_VERSION = 'v10';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
