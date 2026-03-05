@@ -918,16 +918,22 @@ let aggregates = {};
 // Merges server totals with any local votes cast this session.
 async function fetchAggregates() {
   try {
+    // Apps Script redirects through Google's CDN which supports CORS.
+    // Must use redirect:'follow' and omit mode restriction to allow this.
     const res = await fetch(SHEETS_ENDPOINT + '?action=getAggregates', {
       method: 'GET',
-      mode: 'cors',
+      redirect: 'follow',
     });
     if (!res.ok) throw new Error('Sheets fetch failed');
     const data = await res.json();
-    // data is expected: { "pairId": { l, c, r }, ... }
     if (data && typeof data === 'object') {
-      aggregates = data;
-      // Re-render any already-displayed pair bars with fresh counts
+      // Filter out malformed keys (date strings instead of pair IDs)
+      const validData = {};
+      for (const [key, val] of Object.entries(data)) {
+        if (key.startsWith('pair_')) validData[key] = val;
+      }
+      aggregates = validData;
+      // Re-render vote bars on all visible pairs with shared counts
       document.querySelectorAll('[id^="agg_"]').forEach(el => {
         const pairId = el.id.replace('agg_', '');
         if (aggregates[pairId]) {
@@ -948,7 +954,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v10';
+  const CACHE_VERSION = 'v11';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
