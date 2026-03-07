@@ -876,6 +876,10 @@ function keywordOverlapNonPerson(a, b) {
     // Generic political/conflict words that span all Iran sub-stories
     'leadership','structure','invasion','ground','program','middle','social','media',
     'freedom','democracy','tensions','divisions','movement','escalates','escalating',
+    // Words that leak across unrelated stories — appear in different contexts
+    'regime','shared','sources','recent','footage','capital','moment','scenes',
+    'violence','violent','outside','remains','reflects','forward','emotions',
+    'targeted','massive','captured','central','complete','destruction','billowing',
   ]);
   const getWords = (article) => {
     const text = ((article.title||'') + ' ' + (article.description||''))
@@ -972,7 +976,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v19';
+  const CACHE_VERSION = 'v20';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
