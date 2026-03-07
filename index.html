@@ -721,8 +721,19 @@ function buildDynamicClusters(leftArticles, rightArticles) {
     'shooting','shooter','killed','election','vote','voting','ballot',
     'primary','runoff','candidate','senator','governor','congress','republican','democrat',
     'senate','caucus','polling','results','voters','campaign','nominee',
+    // Common 6-7 char words that are too generic to seed a cluster
+    'called','moment','people','things','policy','office','agency','budget',
+    'health','system','dollar','dollars','energy','global','matter','number',
+    'record','reason','school','second','series','simple','single','social',
+    'source','sunday','target','toward','update','weight','window','winter',
+    'worker','center','charge','choice','change','chance','months','moving',
+    'nation','nearly','needed','notice','number','others','output','taking',
+    'toward','trying','turned','united','unless','cannot','always','anyone',
     // Sports terms — site intentionally excludes sports content
     'olympics','athletic','athlete','players','season','league','stadium','coach',
+    // Political campaign terms that are too broad
+    'running','presidential','candidate','campaign','election','healthy','vaccine',
+    'departs','departure','departing','leaving','resigns','resignation','ousted',
   ]);
 
   // Extract meaningful terms from one set of articles
@@ -735,7 +746,7 @@ function buildDynamicClusters(leftArticles, rightArticles) {
       const words = text.split(/\s+/)
         .map(w => w.replace(/'s$/, '').replace(/\u2019s$/, '')) // strip possessives
         .filter(w =>
-          w.length > 5 && !STOPWORDS.has(w) && !/^\d+$/.test(w) && !/^u\.s\.$/.test(w)
+          w.length > 7 && !STOPWORDS.has(w) && !/^\d+$/.test(w) && !/^u\.s\.$/.test(w)
         );
       const seen = new Set();
       for (const w of words) {
@@ -765,20 +776,12 @@ function buildDynamicClusters(leftArticles, rightArticles) {
     }
   }
 
+  // Unigrams disabled — single words are too generic to reliably identify one story.
+  // A bigram like "kristi noem" or "pete hegseth" is specific; "kristi" or "called" alone is not.
   const sharedUnigrams = [];
-  for (const [w, lCount] of Object.entries(left.wordFreq)) {
-    const rCount = right.wordFreq[w] || 0;
-    if (lCount + rCount >= 4 && lCount >= 2 && rCount >= 2) {
-      // Skip if a bigram already covers this word
-      if (sharedBigrams.some(b => b.term.includes(w))) continue;
-      // Skip if a permanent cluster already handles this
-      const covered = PERMANENT_CLUSTERS.some(c => c.keys.some(k => new RegExp(k).test(w)));
-      if (!covered) sharedUnigrams.push({ term: w, count: lCount + rCount });
-    }
-  }
 
   // Sort by frequency, deduplicate overlapping terms, take top 4
-  const allSeeds = [...sharedBigrams, ...sharedUnigrams].sort((a, b) => b.count - a.count);
+  const allSeeds = [...sharedBigrams].sort((a, b) => b.count - a.count);
   const dynamicClusters = [];
   const usedTerms = new Set();
 
@@ -844,7 +847,9 @@ function keywordOverlapScore(a, b) {
 const PERSON_TOKENS = new Set([
   'hegseth','trump','biden','harris','obama','clinton','pelosi','schumer','mcconnell',
   'pence','desantis','newsom','abbott','paxton','cornyn','crockett','talarico','menefee',
-  'gonzales','netanyahu','khamenei','putin','zelensky','macron','modi','sunak'
+  'gonzales','netanyahu','khamenei','putin','zelensky','macron','modi','sunak',
+  'leavitt','noem','crenshaw','blumenthal','spanberger','daines','finebaum',
+  'starmer','bondi','johnson','carter','wilson','taylor','jackson','thomas'
 ]);
 
 function keywordOverlapNonPerson(a, b) {
@@ -865,6 +870,12 @@ function keywordOverlapNonPerson(a, b) {
     // Title/role words — shared whenever the same official is mentioned across stories
     'secretary','defense','pentagon','minister','official','officials','chairman',
     'general','director','department','nuclear','weapons','missile','missiles',
+    // Weak reporting verbs — appear in any story about any official statement
+    'downplayed','brushed','shrugged','denied','claimed','alleged','warned','argued',
+    'suggested','announced','confirmed','declared','stated','responded','pushed','called',
+    // Generic political/conflict words that span all Iran sub-stories
+    'leadership','structure','invasion','ground','program','middle','social','media',
+    'freedom','democracy','tensions','divisions','movement','escalates','escalating',
   ]);
   const getWords = (article) => {
     const text = ((article.title||'') + ' ' + (article.description||''))
@@ -961,7 +972,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v12';
+  const CACHE_VERSION = 'v14';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1088,8 +1099,12 @@ function buildPairs(leftArticles, rightArticles) {
     // These pair weakly because they match any story in the cluster
     const nameCount = (desc.match(/reps?\.?\s+[A-Z]|sen\.?\s+[A-Z]|rep\.?\s+[A-Z]/gi) || []).length;
     if (nameCount >= 3) return true;
-    // Explicit roundup language
+    // Explicit roundup/newsletter language in title
     if (/\b(roundup|takeaways|wrap-?up|recap|what (to|you) know|everything (to|you) need)\b/.test(title)) return true;
+    // Newsletter-style openers in description — casual tone signals non-news content
+    if (/good (morning|afternoon|evening)|happy (monday|tuesday|wednesday|thursday|friday|weekend)|quote of the (week|day)/.test(desc)) return true;
+    // "Daily on X" newsletter format
+    if (/^daily on /.test(title)) return true;
     return false;
   };
 
