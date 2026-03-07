@@ -972,7 +972,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v16';
+  const CACHE_VERSION = 'v18';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1073,7 +1073,12 @@ function buildPairs(leftArticles, rightArticles) {
   const usedLeftUrls = new Set(); // article URLs — prevents same article in 2 pairs
   const usedRightUrls= new Set();
   const TARGET        = 15; // show up to 15 pairs
-  const MAX_PER_TOPIC = 4;  // max 3 pairs per topic
+  const MAX_PER_TOPIC = 4;  // max pairs per topic (high-volume clusters use MAX_HV_TOPIC)
+  const MAX_HV_TOPIC  = 3;  // max pairs for high-volume clusters (Iran, Immigration, etc.)
+  const HV_TOPICS     = new Set([
+    'Iran / Middle East War', 'Ukraine / Russia', 'Israel / Gaza',
+    'Immigration / Deportation', 'Economy / Tariffs', 'Senate / House Primary'
+  ]);
   const MIN_SCORE     = 5;
   const topicCounts   = {};
 
@@ -1133,6 +1138,19 @@ function buildPairs(leftArticles, rightArticles) {
   }
   candidates.sort((a, b) => b.score - a.score);
 
+  // Dynamic flooding detection: pre-count strong candidates per topic.
+  // If any topic has 2x more strong candidates than MAX_PER_TOPIC, it's flooding
+  // the feed — automatically apply the tighter HIGH_VOLUME cap to it too.
+  const candidateTopicCounts = {};
+  for (const c of candidates) {
+    const topic = classifyArticle(leftPool[c.l]) || classifyArticle(rightPool[c.r]);
+    if (topic) candidateTopicCounts[topic] = (candidateTopicCounts[topic] || 0) + 1;
+  }
+  const autoHvTopics = new Set([...HV_TOPICS]);
+  for (const [topic, count] of Object.entries(candidateTopicCounts)) {
+    if (count >= MAX_PER_TOPIC * 2) autoHvTopics.add(topic);
+  }
+
   for (const c of candidates) {
     if (pairs.length >= TARGET) break;
     if (usedLeft.has(c.l) || usedRight.has(c.r)) continue;
@@ -1140,7 +1158,8 @@ function buildPairs(leftArticles, rightArticles) {
     const right = rightPool[c.r];
     if (usedLeftUrls.has(left.url) || usedRightUrls.has(right.url)) continue;
     const topic = classifyArticle(left) || classifyArticle(right);
-    if ((topicCounts[topic] || 0) >= MAX_PER_TOPIC) continue;
+    const topicMax = autoHvTopics.has(topic) ? MAX_HV_TOPIC : MAX_PER_TOPIC;
+    if ((topicCounts[topic] || 0) >= topicMax) continue;
     if (dynamicLabels.has(topic) && breakingCount >= MAX_BREAKING_TOTAL) continue;
     const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right, score: c.score };
     registerPairMeta(pair);
