@@ -972,7 +972,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v18';
+  const CACHE_VERSION = 'v19';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
