@@ -653,7 +653,7 @@ const PERMANENT_CLUSTERS = [
   // ── Domestic policy ────────────────────────────────────────────────────────
   { label: 'Immigration / Deportation', keys: ['deport', 'ice.*detain', 'ice.*agent', 'undocumented', 'migrant.*detain', 'immigrant.*detain', 'asylum seeker', 'unaccompanied minor'] },
   { label: 'Immigration / Border',    keys: ['border.*wall', 'border.*patrol', 'border.*polic', 'immigr.*polic', 'asylum.*polic', 'border.*security', 'border crossing'] },
-  { label: 'Vaccines / Public Health', keys: ['vaccine', 'vaccination', 'measles', 'rfk', 'kennedy.*health', 'cdc.*recommend', 'childhood.*shot', 'herd immunity', 'mmr'] },
+  { label: 'Vaccines / Public Health', keys: ['vaccine', 'vaccination', 'measles', 'mmr', 'herd immunity', 'childhood.*shot', 'fda.*drug', 'cdc.*recommend', 'vinay prasad', 'immuniz', 'antivax', 'anti-vax', 'booster.*dose', 'rfk.*vaccine', 'kennedy.*vaccine'] },
   { label: 'Abortion / Reproductive', keys: ['abortion', 'roe.*wade', 'reproductive.*right', 'pro-life', 'pro-choice', 'planned parenthood', 'fetal', 'dobbs'] },
   { label: 'Gun Policy',              keys: ['gun.*control', 'gun.*right', 'second amendment', 'firearm.*law', 'assault.*weapon', 'background check', 'gun.*legislation'] },
   { label: 'Climate / Energy',        keys: ['climate change', 'global warming', 'fossil fuel', 'renewable energy', 'carbon emission', 'green new deal', 'paris.*accord', 'epa.*rule'] },
@@ -972,7 +972,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v14';
+  const CACHE_VERSION = 'v16';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1073,7 +1073,7 @@ function buildPairs(leftArticles, rightArticles) {
   const usedLeftUrls = new Set(); // article URLs — prevents same article in 2 pairs
   const usedRightUrls= new Set();
   const TARGET        = 15; // show up to 15 pairs
-  const MAX_PER_TOPIC = 3;  // max 3 pairs per topic
+  const MAX_PER_TOPIC = 4;  // max 3 pairs per topic
   const MIN_SCORE     = 5;
   const topicCounts   = {};
 
@@ -1119,8 +1119,9 @@ function buildPairs(leftArticles, rightArticles) {
     return SPORTS_TERMS.some(t => text.includes(t));
   };
   // Only include articles that can be classified — unclassified articles make bad pairs
-  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a));
-  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a));
+  const hasMinDesc = a => (a.description || '').trim().length >= 80;
+  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a) && hasMinDesc(a));
+  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a) && hasMinDesc(a));
 
   // PASS 1: High-confidence matched pairs only (score >= MIN_SCORE), capped per topic
   const candidates = [];
