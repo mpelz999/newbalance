@@ -910,6 +910,13 @@ let activeSources = {
   right: new Set(SOURCES.right.map(s => s.id)),
 };
 let votes = JSON.parse(localStorage.getItem('newsbalance_votes') || '{}');
+// Anonymous session ID — unique per browser, never changes, never identifies the user.
+// Used server-side to deduplicate votes so each browser counts once per pair.
+let sessionId = localStorage.getItem('newsbalance_sid');
+if (!sessionId) {
+  sessionId = 'sid_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('newsbalance_sid', sessionId);
+}
 // aggregates: merged from Sheets (shared) + localStorage (optimistic local updates)
 // Populated on load by fetchAggregates() — starts empty, filled async
 let aggregates = {};
@@ -954,7 +961,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v11';
+  const CACHE_VERSION = 'v12';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1376,11 +1383,12 @@ let pairMetadata = {};
 
 function registerPairMeta(pair) {
   pairMetadata[pair.id] = {
-    topic:         pair.topic,
-    leftSource:    pair.left.source?.name || '',
-    leftHeadline:  pair.left.title || '',
-    rightSource:   pair.right.source?.name || '',
-    rightHeadline: pair.right.title || '',
+    topic:        pair.topic,
+    date:         pair.left?.publishedAt?.slice(0,10) || '',
+    leftSource:   pair.left?.source?.name || '',
+    leftTitle:    pair.left?.title        || '',
+    rightSource:  pair.right?.source?.name || '',
+    rightTitle:   pair.right?.title        || '',
   };
 }
 
@@ -1391,7 +1399,7 @@ function sendVoteToSheets(pairId, vote, agg) {
     method: 'POST',
     mode: 'no-cors',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pairId, vote, agg, ...meta }),
+    body: JSON.stringify({ pairId, vote, agg, sessionId, ...meta }),
   }).catch(() => {});
 }
 
