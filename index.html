@@ -677,7 +677,44 @@
     letter-spacing: 1px;
   }
 
-  /* RESPONSIVE */
+  /* STREAK POPUP */
+  .streak-popup {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 12px 28px;
+    border: 1px solid var(--accent);
+    box-shadow: 0 4px 24px rgba(0,0,0,.3);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s ease, transform .3s ease;
+    z-index: 999;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .streak-popup.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .streak-popup .streak-sub {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+  .streak-popup.milestone {
+    border-color: #c8a84b;
+    background: #1a1200;
+    color: #f0c040;
+  }
   @media (max-width: 480px) {
     .story-card { border-right: none; border-bottom: 1px solid var(--border); }
     .story-card:last-child { border-bottom: none; }
@@ -772,6 +809,8 @@
     <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
   </div>
 </div>
+
+<div id="streak-popup" class="streak-popup"></div>
 
 <footer>
   <a href="https://newsbalance.io">newsbalance.io</a> &nbsp;·&nbsp;
@@ -1219,7 +1258,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v32';
+  const CACHE_VERSION = 'v34';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1898,6 +1937,64 @@ function sendVoteToSheets(pairId, vote, agg) {
   }).catch(() => {});
 }
 
+// ─── STREAK SYSTEM ───────────────────────────────────────────────────────────
+const MILESTONES = [
+  { days: 100, label: '100-Day Arbiter' },
+  { days: 60,  label: '60-Day Sentinel' },
+  { days: 30,  label: '30-Day Juror' },
+  { days: 14,  label: 'Two-Week Judge' },
+  { days: 7,   label: 'One-Week Voter' },
+];
+
+function getStreak() {
+  try {
+    return JSON.parse(localStorage.getItem('newsbalance_streak') || '{"streak":0,"lastVoteDate":"","best":0}');
+  } catch { return { streak: 0, lastVoteDate: '', best: 0 }; }
+}
+
+function updateStreak() {
+  const today = new Date().toISOString().slice(0, 10);
+  const data  = getStreak();
+
+  // Already voted today — no change
+  if (data.lastVoteDate === today) return data;
+
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (data.lastVoteDate === yesterday) {
+    data.streak++;
+  } else {
+    data.streak = 1; // missed a day, reset
+  }
+  data.lastVoteDate = today;
+  data.best = Math.max(data.streak, data.best || 0);
+  localStorage.setItem('newsbalance_streak', JSON.stringify(data));
+  return data;
+}
+
+let _streakPopupTimer = null;
+function showStreakPopup(data) {
+  const popup = document.getElementById('streak-popup');
+  const milestone = MILESTONES.find(m => data.streak === m.days);
+
+  if (milestone) {
+    popup.className = 'streak-popup milestone';
+    popup.innerHTML = `🏅 ${milestone.label}<span class="streak-sub">🗳️ ${data.streak}-day streak · new record</span>`;
+  } else if (data.streak > 1 && data.streak === data.best) {
+    popup.className = 'streak-popup milestone';
+    popup.innerHTML = `🗳️ ${data.streak}-day streak<span class="streak-sub">Personal best!</span>`;
+  } else {
+    popup.className = 'streak-popup';
+    popup.innerHTML = `🗳️ ${data.streak}-day streak<span class="streak-sub">${data.streak === 1 && data.best === 1 ? 'First vote cast — come back tomorrow!' : data.streak === 1 ? 'Welcome back!' : `Best: ${data.best} days`}</span>`;
+  }
+
+  // Show
+  clearTimeout(_streakPopupTimer);
+  requestAnimationFrame(() => {
+    popup.classList.add('visible');
+    _streakPopupTimer = setTimeout(() => popup.classList.remove('visible'), 3500);
+  });
+}
+
 // ─── VOTING ───────────────────────────────────────────────────────────────────
 function castVote(pairId, vote, pairEl) {
   const prev = votes[pairId];
@@ -1921,6 +2018,9 @@ function castVote(pairId, vote, pairEl) {
   // Optimistically render local count immediately
   const aggWrap = pairEl.querySelector(`#agg_${pairId}`);
   if (aggWrap) aggWrap.outerHTML = aggBarHTML(aggregates[pairId], pairId);
+  // Show streak popup on first vote of the day
+  const streakData = updateStreak();
+  showStreakPopup(streakData);
   // Then refresh from Sheets after a short delay to get true shared totals
   setTimeout(() => fetchAggregates(), 1500);
 }
