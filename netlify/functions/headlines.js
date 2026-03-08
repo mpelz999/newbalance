@@ -13,7 +13,8 @@
 //   which starves the algorithm of non-political pairable content.
 // ADDED:   Washington Examiner, Reason — conservative/libertarian with broader topics.
 //          Reuters — wire service for topic diversity on right side.
-//          CBS News, USA Today — added to left for more topic breadth.
+//          CBS News, USA Today, Axios, The Atlantic, Vox — left side topic breadth.
+//          The Federalist, Just the News, The Dispatch — right side depth without pure culture war.
 
 const LEFT_FEEDS = [
   { label: 'CNN',             url: 'https://rss.cnn.com/rss/cnn_topstories.rss' },
@@ -26,6 +27,9 @@ const LEFT_FEEDS = [
   { label: 'Politico',        url: 'https://www.politico.com/rss/politicopicks.xml' },
   { label: 'CBS News',        url: 'https://www.cbsnews.com/latest/rss/main' },
   { label: 'USA Today',       url: 'https://rssfeeds.usatoday.com/usatoday-NewsTopStories' },
+  { label: 'Axios',           url: 'https://api.axios.com/feed/' },
+  { label: 'The Atlantic',    url: 'https://www.theatlantic.com/feed/all/' },
+  { label: 'Vox',             url: 'https://www.vox.com/rss/index.xml' },
 ];
 
 const RIGHT_FEEDS = [
@@ -39,6 +43,9 @@ const RIGHT_FEEDS = [
   { label: 'Reason',           url: 'https://reason.com/feed/' },
   { label: 'Reuters',          url: 'https://feeds.reuters.com/reuters/topNews' },
   { label: 'Daily Mail',       url: 'https://www.dailymail.co.uk/articles.rss' },
+  { label: 'The Federalist',   url: 'https://thefederalist.com/feed/' },
+  { label: 'Just the News',    url: 'https://justthenews.com/rss.xml' },
+  { label: 'The Dispatch',     url: 'https://thedispatch.com/feed/' },
 ];
 
 // Maximum number of articles per feed to attempt OG image fallback on.
