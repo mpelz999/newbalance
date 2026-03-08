@@ -44,7 +44,7 @@ const RIGHT_FEEDS = [
 // Maximum number of articles per feed to attempt OG image fallback on.
 // Keeps total function runtime under Netlify's 10s limit.
 // Only articles missing an RSS image are fetched.
-const MAX_OG_FETCHES_PER_FEED = 5;
+const MAX_OG_FETCHES_PER_FEED = 8;
 const OG_FETCH_TIMEOUT_MS = 3000;
 
 exports.handler = async function(event) {
@@ -159,7 +159,7 @@ function parseRSS(xml, sourceName) {
   const items = xml.match(/<item[\s\S]*?<\/item>/g) ||
                 xml.match(/<entry[\s\S]*?<\/entry>/g) || [];
 
-  for (const item of items.slice(0, 15)) {
+  for (const item of items.slice(0, 20)) {
     const title       = decodeEntities(extractTag(item, 'title'));
     const description = decodeEntities(stripHTML(
       extractTag(item, 'description') ||
@@ -207,25 +207,34 @@ function extractAttr(xml, tag, attr) {
 }
 
 function extractImage(item) {
+  // Priority order: dedicated thumbnail tags first, then content tags, then fallbacks.
+  // media:content can be video (.m3u8, .mp4) — always check for a thumbnail sibling first.
   const patterns = [
-    // Standard media tags
-    /media:content[^>]+url=["']([^"']+)["']/i,
+    // Dedicated thumbnail tags — always images, never video
     /media:thumbnail[^>]+url=["']([^"']+)["']/i,
-    // Enclosure (podcasts/images)
+    // media:content but only if it's explicitly typed as an image
+    /media:content[^>]+type=["']image\/[^"']+["'][^>]*url=["']([^"']+)["']/i,
+    /media:content[^>]+url=["']([^"']+\.(jpg|jpeg|png|webp))["']/i,
+    // Enclosure image
     /enclosure[^>]+url=["']([^"']+\.(jpg|jpeg|png|webp))["']/i,
-    // og:image embedded in RSS item (some outlets include this)
+    // og:image embedded in item
     /property=["']og:image["'][^>]*content=["']([^"']+)["']/i,
     /content=["']([^"']+)["'][^>]*property=["']og:image["']/i,
-    // itunes:image (used by NPR and some others)
+    // itunes:image
     /itunes:image[^>]+href=["']([^"']+)["']/i,
-    // image:url tag (RSS 2.0 channel image, sometimes in items)
-    /<image:url>([^<]+)<\/image:url>/i,
     // First <img> in description HTML
     /<img[^>]+src=["']([^"']+)["']/i,
   ];
   for (const re of patterns) {
     const m = item.match(re);
-    if (m && m[1] && !m[1].includes('pixel') && !m[1].includes('track') && m[1].startsWith('http')) {
+    if (m && m[1]
+      && m[1].startsWith('http')
+      && !m[1].includes('pixel')
+      && !m[1].includes('track')
+      && !m[1].includes('.m3u8')   // skip video playlists
+      && !m[1].includes('.mp4')    // skip video files
+      && !m[1].includes('.webm')
+    ) {
       return m[1];
     }
   }
