@@ -723,6 +723,25 @@
     .story-headline { font-size: 14px; }
     .story-desc { font-size: 12px; }
     .story-card-body { padding: 10px 12px 14px; }
+
+    /* Leaderboard: stack left/right columns vertically on mobile */
+    .lb-cols {
+      grid-template-columns: 1fr;
+    }
+    .lb-col:first-child {
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+    /* Tighten up leaderboard row spacing */
+    .lb-col { padding: 10px 12px; }
+    .lb-outlet { font-size: 11px; }
+    .lb-score { font-size: 12px; }
+    .lb-bar-bg { width: 44px; }
+    .lb-appearances { font-size: 9px; }
+    /* Shrink leaderboard header text */
+    .leaderboard-header { font-size: 10px; padding: 8px 12px; }
+    .lb-meta { font-size: 9px; padding: 8px 12px; }
+    .lb-col-header { font-size: 9px; }
   }
 </style>
 </head>
@@ -1258,7 +1277,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v34';
+  const CACHE_VERSION = 'v35';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
