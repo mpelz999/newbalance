@@ -1109,8 +1109,8 @@ function matchScore(a, b) {
     'Iran / Middle East War', 'Senate / House Primary', 'Ukraine / Russia',
     'Israel / Gaza', 'Immigration / Deportation', 'Economy / Tariffs'
   ]);
-  if (HIGH_VOLUME.has(aAngle) && nonPersonOverlap < 1) {
-    PairingDebugger.logRejection(a, b, 'HIGH_VOLUME: nonPersonOverlap < 1', { cluster: aAngle, overlap, nonPersonOverlap });
+  if (HIGH_VOLUME.has(aAngle) && overlap < 2) {
+    PairingDebugger.logRejection(a, b, 'HIGH_VOLUME: overlap < 2', { cluster: aAngle, overlap, nonPersonOverlap });
     return 0;
   }
 
@@ -1219,7 +1219,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v30';
+  const CACHE_VERSION = 'v31';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
