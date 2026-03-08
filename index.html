@@ -319,6 +319,20 @@
   }
   .story-headline a:hover { color: var(--muted); }
 
+  .read-link {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-decoration: none;
+    margin-bottom: 12px;
+    transition: color .15s;
+  }
+  .read-link:hover { color: var(--accent); }
+  .left-card  .read-link:hover { color: var(--left); }
+  .right-card .read-link:hover { color: var(--right); }
+
   .story-desc {
     font-size: 13px;
     color: var(--muted);
@@ -1167,15 +1181,14 @@ function matchScore(a, b) {
     'Iran / Middle East War', 'Senate / House Primary', 'Ukraine / Russia',
     'Israel / Gaza', 'Immigration / Deportation', 'Economy / Tariffs'
   ]);
-  if (HIGH_VOLUME.has(aAngle) && overlap < 2) {
-    PairingDebugger.logRejection(a, b, 'HIGH_VOLUME: overlap < 2', { cluster: aAngle, overlap, nonPersonOverlap });
+  if (HIGH_VOLUME.has(aAngle) && overlap < 1) {
+    PairingDebugger.logRejection(a, b, 'HIGH_VOLUME: overlap < 1', { cluster: aAngle, overlap, nonPersonOverlap });
     return 0;
   }
 
   const STRICT_CLUSTERS = new Set([
     'Immigration / Deportation',
     'Immigration / Border',
-    'Economy / Tariffs',
     'Criminal Justice',
     'Epstein Investigation',
   ]);
@@ -1277,7 +1290,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v35';
+  const CACHE_VERSION = 'v37';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1584,6 +1597,11 @@ function buildPairs(leftArticles, rightArticles) {
     if (count >= MAX_PER_TOPIC * 2) autoHvTopics.add(topic);
   }
 
+  // Per-source cap: no single outlet appears in more than 2 pairs
+  // This ensures source diversity across the page even on single-topic news days
+  const MAX_PER_SOURCE = 2;
+  const sourceCounts = {}; // outlet name -> pair count
+
   for (const c of candidates) {
     if (pairs.length >= TARGET) break;
     if (usedLeft.has(c.l) || usedRight.has(c.r)) continue;
@@ -1594,6 +1612,11 @@ function buildPairs(leftArticles, rightArticles) {
     const topicMax = autoHvTopics.has(topic) ? MAX_HV_TOPIC : MAX_PER_TOPIC;
     if ((topicCounts[topic] || 0) >= topicMax) continue;
     if (dynamicLabels.has(topic) && breakingCount >= MAX_BREAKING_TOTAL) continue;
+    // Per-source cap check
+    const leftSource  = left.source?.name  || '';
+    const rightSource = right.source?.name || '';
+    if ((sourceCounts[leftSource]  || 0) >= MAX_PER_SOURCE) continue;
+    if ((sourceCounts[rightSource] || 0) >= MAX_PER_SOURCE) continue;
     const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right, score: c.score };
     registerPairMeta(pair);
     pairs.push(pair);
@@ -1602,6 +1625,8 @@ function buildPairs(leftArticles, rightArticles) {
     usedLeftUrls.add(left.url);
     usedRightUrls.add(right.url);
     topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+    sourceCounts[leftSource]  = (sourceCounts[leftSource]  || 0) + 1;
+    sourceCounts[rightSource] = (sourceCounts[rightSource] || 0) + 1;
     if (dynamicLabels.has(topic)) breakingCount++;
   }
 
@@ -1633,6 +1658,10 @@ function buildPairs(leftArticles, rightArticles) {
       if (dynamicLabels.has(c.topic) && breakingCount >= MAX_BREAKING_TOTAL) continue;
       const left  = leftPool[c.l];
       const right = rightPool[c.r];
+      const leftSource  = left.source?.name  || '';
+      const rightSource = right.source?.name || '';
+      if ((sourceCounts[leftSource]  || 0) >= MAX_PER_SOURCE) continue;
+      if ((sourceCounts[rightSource] || 0) >= MAX_PER_SOURCE) continue;
       const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic: c.topic, left, right, score: c.score };
       registerPairMeta(pair);
       pairs.push(pair);
@@ -1641,6 +1670,8 @@ function buildPairs(leftArticles, rightArticles) {
       usedLeftUrls.add(leftPool[c.l].url);
       usedRightUrls.add(rightPool[c.r].url);
       topicCounts[c.topic] = (topicCounts[c.topic] || 0) + 1;
+      sourceCounts[leftSource]  = (sourceCounts[leftSource]  || 0) + 1;
+      sourceCounts[rightSource] = (sourceCounts[rightSource] || 0) + 1;
       if (dynamicLabels.has(c.topic)) breakingCount++;
     }
   }
@@ -1823,6 +1854,7 @@ function cardHTML(side, article, pairId, currentVote, showImgZone = true) {
         <div class="story-source"><span class="source-dot"></span>${source}</div>
         <div class="story-headline"><a href="${url}" target="_blank" rel="noopener">${title}</a></div>
         ${desc ? `<div class="story-desc">${cleanDesc(desc)}</div>` : ''}
+        <a href="${url}" target="_blank" rel="noopener" class="read-link">↗ Read full article</a>
         <div class="vote-row">
           <button class="vote-btn ${side}-vote${currentVote === side ? ' voted' : ''}" data-v="${side}">
             ${side === 'left' ? '◀' : '▶'} More Balanced
