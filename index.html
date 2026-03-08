@@ -1219,7 +1219,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v27';
+  const CACHE_VERSION = 'v28';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1448,25 +1448,31 @@ function buildPairs(leftArticles, rightArticles) {
     && !url.includes('.m3u8')
     && !url.includes('.mp4')
     && !url.includes('.webm');
-  // Exclude newsletter digests — these are multi-topic roundups that match anything
-  // Detection: title starts with a topic then "Plus:" in description, or very short title
+  // Exclude newsletter digests, video shorts, and thin-content articles
   const isDigest = (a) => {
     const title = (a.title || '').toLowerCase();
-    const desc  = (a.description || '').toLowerCase();
+    const desc  = (a.description || '').toLowerCase().trim();
     // Reason-style newsletter digest: short topic title + "plus:" in description
     if (desc.includes('plus:') && desc.includes('...')) return true;
     if (title.split(' ').length <= 3 && desc.includes('plus:')) return true;
-    // Broad roundup articles: description lists 4+ names separated by commas/and
-    // e.g. "Crenshaw losing and Reps. Al Green, Menefee, Johnson and Foushee in tight races"
-    // These pair weakly because they match any story in the cluster
+    // Broad roundup articles
     const nameCount = (desc.match(/reps?\.?\s+[A-Z]|sen\.?\s+[A-Z]|rep\.?\s+[A-Z]/gi) || []).length;
     if (nameCount >= 3) return true;
     // Explicit roundup/newsletter language in title
     if (/\b(roundup|takeaways|wrap-?up|recap|what (to|you) know|everything (to|you) need)\b/.test(title)) return true;
-    // Newsletter-style openers in description — casual tone signals non-news content
+    // Newsletter-style openers in description
     if (/good (morning|afternoon|evening)|happy (monday|tuesday|wednesday|thursday|friday|weekend)|quote of the (week|day)/.test(desc)) return true;
     // "Daily on X" newsletter format
     if (/^daily on /.test(title)) return true;
+    // Video shorts — "WATCH:" prefix signals a clip, not a news article
+    if (/^watch:?\s/i.test(a.title || '')) return true;
+    // NBC/ABC video shorts where description just repeats the title verbatim
+    const cleanTitle = (a.title || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    const cleanDesc  = desc.replace(/[^a-z0-9\s]/g, '').trim();
+    if (cleanDesc && cleanDesc === cleanTitle) return true;
+    if (cleanDesc && cleanTitle.includes(cleanDesc) && cleanDesc.length < 80) return true;
+    // Live blog / rolling updates — these are catch-all articles that match everything
+    if (/^live(\s+updates?)?:|live blog/i.test(a.title || '')) return true;
     return false;
   };
 
