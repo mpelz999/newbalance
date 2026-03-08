@@ -1085,26 +1085,29 @@ function matchScore(a, b) {
   const aAngle = classifyArticle(a);
   const bAngle = classifyArticle(b);
 
-  if (!aAngle || !bAngle || aAngle !== bAngle) return 0;
+  if (!aAngle || !bAngle || aAngle !== bAngle) {
+    if (PAIRING_DEBUG && aAngle && bAngle && aAngle !== bAngle) {
+      // Only log cross-cluster near-misses (both classified but different cluster)
+      const overlap = keywordOverlapScore(a, b);
+      if (overlap >= 3) {
+        PairingDebugger.logRejection(a, b, 'different clusters (high overlap)', { aAngle, bAngle, overlap });
+      }
+    }
+    return 0;
+  }
 
   const overlap = keywordOverlapScore(a, b);
   const nonPersonOverlap = keywordOverlapNonPerson(a, b);
 
-  // Permanent high-volume clusters fire on many different sub-events each day.
-  // Require 1+ shared non-person, non-cluster event keyword to prevent cross-event pairs:
-  //   - Gonzales House race paired with Cornyn/Paxton Senate race (both 'Primary')
-  //   - Girls school strike paired with submarine sinking (both 'Iran War')
-  // Dynamic/breaking clusters (e.g. [BREAKING] PENTAGON) are already specific — skip check.
   const HIGH_VOLUME = new Set([
     'Iran / Middle East War', 'Senate / House Primary', 'Ukraine / Russia',
     'Israel / Gaza', 'Immigration / Deportation', 'Economy / Tariffs'
   ]);
-  if (HIGH_VOLUME.has(aAngle) && nonPersonOverlap < 1) return 0;
+  if (HIGH_VOLUME.has(aAngle) && nonPersonOverlap < 1) {
+    PairingDebugger.logRejection(a, b, 'HIGH_VOLUME: nonPersonOverlap < 1', { cluster: aAngle, overlap, nonPersonOverlap });
+    return 0;
+  }
 
-  // Stricter clusters: articles must share a concrete subject — a named person,
-  // place, specific policy, or event — not just fall into the same broad topic.
-  // These clusters are broad enough that two very different stories can match the
-  // topic keyword while covering entirely different events.
   const STRICT_CLUSTERS = new Set([
     'Immigration / Deportation',
     'Immigration / Border',
@@ -1114,15 +1117,13 @@ function matchScore(a, b) {
   ]);
 
   if (STRICT_CLUSTERS.has(aAngle)) {
-    // Require 2+ shared non-person, non-cluster words
-    if (nonPersonOverlap < 2) return 0;
+    if (nonPersonOverlap < 1) {
+      PairingDebugger.logRejection(a, b, 'STRICT: nonPersonOverlap < 1', { cluster: aAngle, overlap, nonPersonOverlap });
+      return 0;
+    }
 
-    // Additionally require at least 1 shared SPECIFIC token:
-    // a proper noun (capitalized word), place name, or named individual
-    // extracted from the raw titles (before lowercasing).
     const specificTokens = (article) => {
       const title = article.title || '';
-      // Extract capitalized words 4+ chars that aren't common title-case words
       const TITLE_STOPWORDS = new Set([
         'This','That','With','From','After','Into','Over','When','Where','Which',
         'Also','Just','More','Most','About','Their','There','These','Those','Have',
@@ -1140,7 +1141,14 @@ function matchScore(a, b) {
     const bTokens = specificTokens(b);
     let sharedSpecific = 0;
     for (const t of aTokens) { if (bTokens.has(t)) sharedSpecific++; }
-    if (sharedSpecific < 1) return 0;
+    if (sharedSpecific < 1) {
+      PairingDebugger.logRejection(a, b, 'STRICT: no shared specific tokens', {
+        cluster: aAngle, nonPersonOverlap,
+        aTokens: [...aTokens].join(', '),
+        bTokens: [...bTokens].join(', '),
+      });
+      return 0;
+    }
   }
 
   let score = 5;
@@ -1205,7 +1213,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v21';
+  const CACHE_VERSION = 'v22';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1296,7 +1304,112 @@ async function fetchNews() {
   }
 }
 
-// ─── SMART PAIR BUILDER ───────────────────────────────────────────────────────
+// ─── PAIRING DEBUGGER ────────────────────────────────────────────────────────
+// Open browser DevTools > Console to see detailed pairing diagnostics.
+// Set PAIRING_DEBUG = false to silence in production.
+const PAIRING_DEBUG = true;
+
+const PairingDebugger = {
+  _rejections: [],
+  _pools: { left: [], right: [] },
+
+  reset() {
+    this._rejections = [];
+    this._pools = { left: [], right: [] };
+  },
+
+  logPools(leftPool, rightPool, leftArticles, rightArticles) {
+    if (!PAIRING_DEBUG) return;
+    console.group('%c📰 NewsBalance Pairing Debug', 'font-size:14px;font-weight:bold;color:#1a4b8c');
+    console.log(`Feed size: ${leftArticles.length} left, ${rightArticles.length} right articles`);
+    console.log(`After pool filters: ${leftPool.length} left, ${rightPool.length} right eligible`);
+
+    const leftFiltered  = leftArticles.filter(a => !leftPool.includes(a));
+    const rightFiltered = rightArticles.filter(a => !rightPool.includes(a));
+
+    if (leftFiltered.length || rightFiltered.length) {
+      console.group('🚫 Filtered out before pairing:');
+      [...leftFiltered.map(a => ({...a, _side:'LEFT'})), ...rightFiltered.map(a => ({...a, _side:'RIGHT'}))].forEach(a => {
+        const reasons = [];
+        if (!a.title || a.title === '[Removed]') reasons.push('no title');
+        if (!a.urlToImage || !a.urlToImage.startsWith('http')) reasons.push('no/bad image URL');
+        if (!classifyArticle(a)) reasons.push(`unclassified (no cluster match)`);
+        if ((a.description || '').trim().length < 80) reasons.push(`desc too short (${(a.description||'').trim().length} chars)`);
+        // isDigest / isSports checks repeated inline for logging
+        const title = (a.title||'').toLowerCase(), desc = (a.description||'').toLowerCase();
+        if (desc.includes('plus:') && desc.includes('...')) reasons.push('digest/newsletter');
+        console.log(`  [${a._side}] "${a.title?.slice(0,60)}" → ${reasons.join(', ') || 'unknown'}`);
+      });
+      console.groupEnd();
+    }
+
+    console.group('✅ Left pool (classified):');
+    leftPool.forEach(a => console.log(`  [${classifyArticle(a)}] ${a.source?.name} — "${a.title?.slice(0,70)}"`));
+    console.groupEnd();
+    console.group('✅ Right pool (classified):');
+    rightPool.forEach(a => console.log(`  [${classifyArticle(a)}] ${a.source?.name} — "${a.title?.slice(0,70)}"`));
+    console.groupEnd();
+    console.groupEnd();
+  },
+
+  logRejection(a, b, reason, details = {}) {
+    if (!PAIRING_DEBUG) return;
+    this._rejections.push({ a, b, reason, details });
+  },
+
+  logCandidates(candidates, leftPool, rightPool) {
+    if (!PAIRING_DEBUG) return;
+    console.group('%c🔗 Match candidates (score >= MIN_SCORE)', 'color:#c8a84b;font-weight:bold');
+    if (!candidates.length) {
+      console.warn('  No candidates found — all pairs were rejected');
+    } else {
+      candidates.forEach(c => {
+        const l = leftPool[c.l], r = rightPool[c.r];
+        console.log(`  score=${c.score} | [${classifyArticle(l)}]\n    L: ${l.source?.name} — "${l.title?.slice(0,60)}"\n    R: ${r.source?.name} — "${r.title?.slice(0,60)}"`);
+      });
+    }
+    console.groupEnd();
+  },
+
+  logRejectionSummary() {
+    if (!PAIRING_DEBUG || !this._rejections.length) return;
+    console.group('%c❌ matchScore rejections', 'color:#8c1a1a;font-weight:bold');
+    // Group by reason
+    const byReason = {};
+    this._rejections.forEach(r => {
+      if (!byReason[r.reason]) byReason[r.reason] = [];
+      byReason[r.reason].push(r);
+    });
+    Object.entries(byReason).forEach(([reason, items]) => {
+      console.group(`  ${reason} (${items.length} pairs rejected)`);
+      items.slice(0, 8).forEach(({ a, b, details }) => {
+        console.log(
+          `    L: ${a.source?.name} — "${a.title?.slice(0,55)}"\n` +
+          `    R: ${b.source?.name} — "${b.title?.slice(0,55)}"` +
+          (Object.keys(details).length ? `\n    ${JSON.stringify(details)}` : '')
+        );
+      });
+      if (items.length > 8) console.log(`    … and ${items.length - 8} more`);
+      console.groupEnd();
+    });
+    console.groupEnd();
+  },
+
+  logFinalPairs(pairs) {
+    if (!PAIRING_DEBUG) return;
+    console.group('%c✅ Final pairs selected', 'color:#2e7d32;font-weight:bold');
+    if (!pairs.length) {
+      console.warn('  No pairs were built!');
+    } else {
+      pairs.forEach((p, i) => {
+        console.log(`  ${i+1}. [${p.topic}] score=${p.score}\n     L: ${p.left.source?.name} — "${p.left.title?.slice(0,55)}"\n     R: ${p.right.source?.name} — "${p.right.title?.slice(0,55)}"`);
+      });
+    }
+    console.groupEnd();
+    // Print rejection summary after final pairs
+    this.logRejectionSummary();
+  },
+};
 function buildPairs(leftArticles, rightArticles) {
   // Initialize dynamic clusters from today's actual feed content
   initClusters(leftArticles, rightArticles);
@@ -1306,9 +1419,9 @@ function buildPairs(leftArticles, rightArticles) {
   const usedRight    = new Set(); // pool indices
   const usedLeftUrls = new Set(); // article URLs — prevents same article in 2 pairs
   const usedRightUrls= new Set();
-  const TARGET        = 15; // show up to 15 pairs
+  const TARGET        = 10; // show up to 10 pairs
   const MAX_PER_TOPIC = 4;  // max pairs per topic (high-volume clusters use MAX_HV_TOPIC)
-  const MAX_HV_TOPIC  = 3;  // max pairs for high-volume clusters (Iran, Immigration, etc.)
+  const MAX_HV_TOPIC  = 4;  // max pairs for high-volume clusters (Iran, Immigration, etc.)
   const HV_TOPICS     = new Set([
     'Iran / Middle East War', 'Ukraine / Russia', 'Israel / Gaza',
     'Immigration / Deportation', 'Economy / Tariffs', 'Senate / House Primary'
@@ -1362,6 +1475,8 @@ function buildPairs(leftArticles, rightArticles) {
   const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a) && hasMinDesc(a));
   const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a) && hasMinDesc(a));
 
+  PairingDebugger.logPools(leftPool, rightPool, leftArticles, rightArticles);
+
   // PASS 1: High-confidence matched pairs only (score >= MIN_SCORE), capped per topic
   const candidates = [];
   for (let l = 0; l < leftPool.length; l++) {
@@ -1371,6 +1486,7 @@ function buildPairs(leftArticles, rightArticles) {
     }
   }
   candidates.sort((a, b) => b.score - a.score);
+  PairingDebugger.logCandidates(candidates, leftPool, rightPool);
 
   // Dynamic flooding detection: pre-count strong candidates per topic.
   // If any topic has 2x more strong candidates than MAX_PER_TOPIC, it's flooding
@@ -1464,6 +1580,7 @@ function buildPairs(leftArticles, rightArticles) {
     if (topicQueues.every(q => q.length === 0)) break;
   }
 
+  PairingDebugger.logFinalPairs(sorted);
   return sorted;
 }
 
