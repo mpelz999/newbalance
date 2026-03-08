@@ -1219,7 +1219,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v25';
+  const CACHE_VERSION = 'v27';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1443,7 +1443,11 @@ function buildPairs(leftArticles, rightArticles) {
   const MAX_BREAKING_TOTAL = 4;  // max pairs from dynamic/breaking topics combined
   let breakingCount = 0;
 
-  const isValidImage = (url) => url && url !== 'undefined' && url !== 'null' && !url.includes('.m3u8') && url.startsWith('http');
+  const isValidImage = (url) => url && url !== 'undefined' && url !== 'null'
+    && url.startsWith('http')
+    && !url.includes('.m3u8')
+    && !url.includes('.mp4')
+    && !url.includes('.webm');
   // Exclude newsletter digests — these are multi-topic roundups that match anything
   // Detection: title starts with a topic then "Plus:" in description, or very short title
   const isDigest = (a) => {
@@ -1709,6 +1713,18 @@ function createPairEl(pair, idx) {
   return el;
 }
 
+function cleanDesc(desc) {
+  if (!desc) return '';
+  return desc
+    // Strip Guardian-style related-stories bullets: "* Some headline\n* Another"
+    .replace(/\s*\*\s+[A-Z].*/g, '')
+    // Strip "Continue reading..." and similar truncation artifacts
+    .replace(/\s*(Continue reading|Read more|Read full|Click here|Subscribe).*/i, '')
+    // Strip trailing ellipsis fragments that cut mid-word
+    .replace(/\s+\w{1,4}$/, '')
+    .trim();
+}
+
 function cardHTML(side, article, pairId, currentVote, showImgZone = true) {
   const url   = article.url || '#';
   const title = article.title || 'No headline available';
@@ -1733,7 +1749,7 @@ function cardHTML(side, article, pairId, currentVote, showImgZone = true) {
       <div class="story-card-body">
         <div class="story-source"><span class="source-dot"></span>${source}</div>
         <div class="story-headline"><a href="${url}" target="_blank" rel="noopener">${title}</a></div>
-        ${desc ? `<div class="story-desc">${desc}</div>` : ''}
+        ${desc ? `<div class="story-desc">${cleanDesc(desc)}</div>` : ''}
         <div class="vote-row">
           <button class="vote-btn ${side}-vote${currentVote === side ? ' voted' : ''}" data-v="${side}">
             ${side === 'left' ? '◀' : '▶'} More Balanced
