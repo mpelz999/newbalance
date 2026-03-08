@@ -701,9 +701,9 @@
     color: var(--accent);
     font-family: var(--font-mono);
     font-size: 13px;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
-    padding: 12px 28px;
+    padding: 16px 32px;
     border: 1px solid var(--accent);
     box-shadow: 0 4px 24px rgba(0,0,0,.3);
     opacity: 0;
@@ -712,22 +712,44 @@
     z-index: 999;
     white-space: nowrap;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
   }
   .streak-popup.visible {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+  .streak-popup .streak-emoji {
+    font-size: 22px;
+    line-height: 1;
+    margin-bottom: 2px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .streak-popup .streak-main {
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
   .streak-popup .streak-sub {
-    display: block;
     font-size: 10px;
     color: var(--muted);
-    margin-top: 4px;
+    margin-top: 2px;
     letter-spacing: 1px;
   }
   .streak-popup.milestone {
     border-color: #c8a84b;
     background: #1a1200;
+    box-shadow: 0 0 32px rgba(200,168,75,.25);
+  }
+  .streak-popup.milestone .streak-main {
     color: #f0c040;
+    font-size: 14px;
+  }
+  .streak-popup.milestone .streak-emoji {
+    font-size: 28px;
   }
   @media (max-width: 480px) {
     .story-card { border-right: none; border-bottom: 1px solid var(--border); }
@@ -1290,7 +1312,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v37';
+  const CACHE_VERSION = 'v38';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1512,7 +1534,7 @@ function buildPairs(leftArticles, rightArticles) {
     'Iran / Middle East War', 'Ukraine / Russia', 'Israel / Gaza',
     'Immigration / Deportation', 'Economy / Tariffs', 'Senate / House Primary'
   ]);
-  const MIN_SCORE     = 5;
+  const MIN_SCORE     = 7;
   const topicCounts   = {};
 
   // Breaking news cap: ALL dynamic clusters share a single pool of 4 pairs max.
@@ -1568,8 +1590,13 @@ function buildPairs(leftArticles, rightArticles) {
   };
   // Only include articles that can be classified — unclassified articles make bad pairs
   const hasMinDesc = a => (a.description || '').trim().length >= 40;
-  const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a) && hasMinDesc(a));
-  const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a) && hasMinDesc(a));
+  const MIN_PAIRS   = 6;  // fallback to imageless articles if we can't hit this
+  const baseFilter  = a => a.title && a.title !== '[Removed]' && classifyArticle(a) && !isDigest(a) && !isSports(a) && hasMinDesc(a);
+  const leftPool    = leftArticles.filter(a => baseFilter(a) && isValidImage(a.urlToImage));
+  const rightPool   = rightArticles.filter(a => baseFilter(a) && isValidImage(a.urlToImage));
+  // Fallback pools: include articles without images (shown with placeholder)
+  const leftPoolAll  = leftArticles.filter(a => baseFilter(a));
+  const rightPoolAll = rightArticles.filter(a => baseFilter(a));
 
   PairingDebugger.logPools(leftPool, rightPool, leftArticles, rightArticles);
 
@@ -1673,6 +1700,47 @@ function buildPairs(leftArticles, rightArticles) {
       sourceCounts[leftSource]  = (sourceCounts[leftSource]  || 0) + 1;
       sourceCounts[rightSource] = (sourceCounts[rightSource] || 0) + 1;
       if (dynamicLabels.has(c.topic)) breakingCount++;
+    }
+  }
+
+  // PASS 3: Image-fallback fill — if we're still below MIN_PAIRS, use articles without images
+  // These show a placeholder image. Better to show 6 real pairs than 3 with photos.
+  if (pairs.length < MIN_PAIRS) {
+    const fallbackCandidates = [];
+    for (let l = 0; l < leftPoolAll.length; l++) {
+      if (usedLeftUrls.has(leftPoolAll[l].url)) continue;
+      for (let r = 0; r < rightPoolAll.length; r++) {
+        if (usedRightUrls.has(rightPoolAll[r].url)) continue;
+        const score = matchScore(leftPoolAll[l], rightPoolAll[r]);
+        if (score >= MIN_SCORE) {
+          const topic = classifyArticle(leftPoolAll[l]) || classifyArticle(rightPoolAll[r]);
+          fallbackCandidates.push({ l, r, score, topic });
+        }
+      }
+    }
+    fallbackCandidates.sort((a, b) => b.score - a.score);
+    for (const c of fallbackCandidates) {
+      if (pairs.length >= MIN_PAIRS) break;
+      if (usedLeftUrls.has(leftPoolAll[c.l].url) || usedRightUrls.has(rightPoolAll[c.r].url)) continue;
+      const topic = c.topic;
+      const topicMax = autoHvTopics.has(topic) ? MAX_HV_TOPIC : MAX_PER_TOPIC;
+      if ((topicCounts[topic] || 0) >= topicMax) continue;
+      if (dynamicLabels.has(topic) && breakingCount >= MAX_BREAKING_TOTAL) continue;
+      const left  = leftPoolAll[c.l];
+      const right = rightPoolAll[c.r];
+      const leftSource  = left.source?.name  || '';
+      const rightSource = right.source?.name || '';
+      if ((sourceCounts[leftSource]  || 0) >= MAX_PER_SOURCE) continue;
+      if ((sourceCounts[rightSource] || 0) >= MAX_PER_SOURCE) continue;
+      const pair = { id: `pair_${new Date().toISOString().slice(0,10)}_${pairs.length}`, topic, left, right, score: c.score, imageFallback: true };
+      registerPairMeta(pair);
+      pairs.push(pair);
+      usedLeftUrls.add(left.url);
+      usedRightUrls.add(right.url);
+      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+      sourceCounts[leftSource]  = (sourceCounts[leftSource]  || 0) + 1;
+      sourceCounts[rightSource] = (sourceCounts[rightSource] || 0) + 1;
+      if (dynamicLabels.has(topic)) breakingCount++;
     }
   }
 
@@ -1990,11 +2058,19 @@ function sendVoteToSheets(pairId, vote, agg) {
 
 // ─── STREAK SYSTEM ───────────────────────────────────────────────────────────
 const MILESTONES = [
-  { days: 100, label: '100-Day Arbiter' },
-  { days: 60,  label: '60-Day Sentinel' },
-  { days: 30,  label: '30-Day Juror' },
-  { days: 14,  label: 'Two-Week Judge' },
-  { days: 7,   label: 'One-Week Voter' },
+  { days: 5,   emoji: '🗳️',  label: '5-Day Streak!',   sub: "You're on a roll — keep it going!" },
+  { days: 10,  emoji: '⚖️',  label: '10-Day Streak!',  sub: 'Double digits. Serious civic energy.' },
+  { days: 15,  emoji: '📰',  label: '15-Day Streak!',  sub: 'Two weeks strong. Democracy approves.' },
+  { days: 20,  emoji: '🔥',  label: '20-Day Streak!',  sub: 'Three weeks of balanced news. Impressive.' },
+  { days: 25,  emoji: '🏅',  label: '25-Day Streak!',  sub: 'A quarter-century of daily votes!' },
+  { days: 30,  emoji: '🥇',  label: '30-Day Streak!',  sub: "One month. You're a NewsBalance regular." },
+  { days: 45,  emoji: '🌟',  label: '45-Day Streak!',  sub: 'Six weeks of civic duty. Remarkable.' },
+  { days: 60,  emoji: '💎',  label: '60-Day Streak!',  sub: "Two months. You're basically a journalist." },
+  { days: 75,  emoji: '🦅',  label: '75-Day Streak!',  sub: 'Unwavering. The republic thanks you.' },
+  { days: 100, emoji: '👑',  label: '100-Day Streak!', sub: "Legendary. You've seen it all." },
+  { days: 150, emoji: '🌍',  label: '150-Day Streak!', sub: 'Five months of balanced perspective.' },
+  { days: 200, emoji: '🚀',  label: '200-Day Streak!', sub: 'You might be the most informed person alive.' },
+  { days: 365, emoji: '🎖️',  label: 'One Full Year!',  sub: 'A year of balance. Truly extraordinary.' },
 ];
 
 function getStreak() {
@@ -2026,23 +2102,51 @@ let _streakPopupTimer = null;
 function showStreakPopup(data) {
   const popup = document.getElementById('streak-popup');
   const milestone = MILESTONES.find(m => data.streak === m.days);
+  const isBest = data.streak > 1 && data.streak === data.best;
 
   if (milestone) {
     popup.className = 'streak-popup milestone';
-    popup.innerHTML = `🏅 ${milestone.label}<span class="streak-sub">🗳️ ${data.streak}-day streak · new record</span>`;
-  } else if (data.streak > 1 && data.streak === data.best) {
+    popup.innerHTML = `
+      <span class="streak-emoji">${milestone.emoji}</span>
+      <span class="streak-main">${milestone.label}</span>
+      <span class="streak-sub">${milestone.sub}</span>
+    `;
+  } else if (isBest) {
     popup.className = 'streak-popup milestone';
-    popup.innerHTML = `🗳️ ${data.streak}-day streak<span class="streak-sub">Personal best!</span>`;
+    popup.innerHTML = `
+      <span class="streak-emoji">🗳️</span>
+      <span class="streak-main">${data.streak}-Day Streak!</span>
+      <span class="streak-sub">New personal best!</span>
+    `;
+  } else if (data.streak === 1 && data.best <= 1) {
+    popup.className = 'streak-popup';
+    popup.innerHTML = `
+      <span class="streak-emoji">🗳️</span>
+      <span class="streak-main">First vote cast!</span>
+      <span class="streak-sub">Come back tomorrow to start a streak.</span>
+    `;
+  } else if (data.streak === 1) {
+    popup.className = 'streak-popup';
+    popup.innerHTML = `
+      <span class="streak-emoji">🗳️</span>
+      <span class="streak-main">Welcome back!</span>
+      <span class="streak-sub">Best streak: ${data.best} days.</span>
+    `;
   } else {
     popup.className = 'streak-popup';
-    popup.innerHTML = `🗳️ ${data.streak}-day streak<span class="streak-sub">${data.streak === 1 && data.best === 1 ? 'First vote cast — come back tomorrow!' : data.streak === 1 ? 'Welcome back!' : `Best: ${data.best} days`}</span>`;
+    popup.innerHTML = `
+      <span class="streak-emoji">🗳️</span>
+      <span class="streak-main">${data.streak}-Day Streak</span>
+      <span class="streak-sub">Best: ${data.best} days · Keep it up!</span>
+    `;
   }
 
-  // Show
+  // Show — milestones stay longer
+  const duration = milestone || isBest ? 5000 : 3500;
   clearTimeout(_streakPopupTimer);
   requestAnimationFrame(() => {
     popup.classList.add('visible');
-    _streakPopupTimer = setTimeout(() => popup.classList.remove('visible'), 3500);
+    _streakPopupTimer = setTimeout(() => popup.classList.remove('visible'), duration);
   });
 }
 
