@@ -263,8 +263,10 @@
 
   .story-img {
     width: 100%;
-    height: 180px;
+    height: auto;
+    max-height: 240px;
     object-fit: cover;
+    object-position: center top;
     display: block;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
@@ -272,7 +274,7 @@
 
   .story-img-placeholder {
     width: 100%;
-    height: 180px;
+    height: 160px;
     background: linear-gradient(135deg, var(--bg) 0%, var(--border) 100%);
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -1099,6 +1101,48 @@ function matchScore(a, b) {
   ]);
   if (HIGH_VOLUME.has(aAngle) && nonPersonOverlap < 1) return 0;
 
+  // Stricter clusters: articles must share a concrete subject — a named person,
+  // place, specific policy, or event — not just fall into the same broad topic.
+  // These clusters are broad enough that two very different stories can match the
+  // topic keyword while covering entirely different events.
+  const STRICT_CLUSTERS = new Set([
+    'Immigration / Deportation',
+    'Immigration / Border',
+    'Economy / Tariffs',
+    'Criminal Justice',
+    'Epstein Investigation',
+  ]);
+
+  if (STRICT_CLUSTERS.has(aAngle)) {
+    // Require 2+ shared non-person, non-cluster words
+    if (nonPersonOverlap < 2) return 0;
+
+    // Additionally require at least 1 shared SPECIFIC token:
+    // a proper noun (capitalized word), place name, or named individual
+    // extracted from the raw titles (before lowercasing).
+    const specificTokens = (article) => {
+      const title = article.title || '';
+      // Extract capitalized words 4+ chars that aren't common title-case words
+      const TITLE_STOPWORDS = new Set([
+        'This','That','With','From','After','Into','Over','When','Where','Which',
+        'Also','Just','More','Most','About','Their','There','These','Those','Have',
+        'Says','Said','Will','Could','Would','Should','Being','During','While',
+        'Trump','Biden','House','White','United','States','Senate','Congress',
+        'Democrats','Republicans','Federal','American','Americans',
+      ]);
+      return new Set(
+        title.split(/\s+/)
+          .map(w => w.replace(/[^A-Za-z]/g, ''))
+          .filter(w => w.length >= 4 && /^[A-Z]/.test(w) && !TITLE_STOPWORDS.has(w))
+      );
+    };
+    const aTokens = specificTokens(a);
+    const bTokens = specificTokens(b);
+    let sharedSpecific = 0;
+    for (const t of aTokens) { if (bTokens.has(t)) sharedSpecific++; }
+    if (sharedSpecific < 1) return 0;
+  }
+
   let score = 5;
   score += Math.min(overlap * 2, 10);
   return score;
@@ -1161,7 +1205,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v20';
+  const CACHE_VERSION = 'v21';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
