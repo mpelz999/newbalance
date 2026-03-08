@@ -514,6 +514,167 @@
   }
   footer a { color: var(--accent); text-decoration: none; }
 
+  /* LEADERBOARD */
+  .leaderboard-wrap {
+    margin-bottom: 28px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .leaderboard-header {
+    width: 100%;
+    background: var(--ink);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .leaderboard-header .lb-header-right {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .leaderboard-body {
+    display: block;
+    padding: 0;
+  }
+
+  .lb-meta {
+    padding: 10px 16px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .lb-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  .lb-col {
+    padding: 12px 16px;
+  }
+  .lb-col:first-child {
+    border-right: 1px solid var(--border);
+  }
+
+  .lb-col-header {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid currentColor;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .lb-col-header.left-hdr { color: var(--left); }
+  .lb-col-header.right-hdr { color: var(--right); }
+
+  .lb-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+    animation: slideIn .3s ease both;
+  }
+  .lb-row:last-child { border-bottom: none; }
+
+  .lb-rank {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--border);
+    width: 16px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .lb-rank.gold   { color: #c8a84b; font-weight: 700; }
+  .lb-rank.silver { color: #9a9a9a; font-weight: 700; }
+  .lb-rank.bronze { color: #a0724a; font-weight: 700; }
+
+  .lb-outlet {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lb-score-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+
+  .lb-score {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .lb-col:first-child .lb-score { color: var(--left); }
+  .lb-col:last-child  .lb-score { color: var(--right); }
+
+  .lb-bar-bg {
+    width: 60px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .lb-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .6s ease;
+  }
+  .lb-col:first-child .lb-bar-fill { background: var(--left); }
+  .lb-col:last-child  .lb-bar-fill { background: var(--right); }
+
+  .lb-appearances {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .lb-loading {
+    text-align: center;
+    padding: 24px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .lb-no-data {
+    text-align: center;
+    padding: 20px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
   /* RESPONSIVE */
   @media (max-width: 480px) {
     .story-card { border-right: none; border-bottom: 1px solid var(--border); }
@@ -559,6 +720,30 @@
     </div>
     <div class="col-label right-label">
       Right Perspective <span>▶</span>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="leaderboard-wrap" id="leaderboard-wrap">
+    <div class="leaderboard-header">
+      <span>⚖ Outlet Balance Leaderboard</span>
+      <span class="lb-header-right" id="lb-subtitle">Who covers the news most fairly?</span>
+    </div>
+    <div class="leaderboard-body" id="leaderboard-body">
+      <div class="lb-loading" id="lb-loading"><span class="spinner"></span> Loading scores…</div>
+      <div id="lb-content" style="display:none">
+        <div class="lb-meta" id="lb-meta"></div>
+        <div class="lb-cols">
+          <div class="lb-col" id="lb-left-col">
+            <div class="lb-col-header left-hdr">◀ Left Outlets</div>
+            <div id="lb-left-rows"></div>
+          </div>
+          <div class="lb-col" id="lb-right-col">
+            <div class="lb-col-header right-hdr">Right Outlets ▶</div>
+            <div id="lb-right-rows"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1008,6 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     fetchNews();
   }
+  fetchLeaderboard();
 });
 
 let refreshTimer = null;
@@ -1414,6 +1600,78 @@ function aggBarHTML(agg, id) {
         <span class="cnt-right">${rPct}% Right</span>
       </div>
     </div>`;
+}
+
+// ─── LEADERBOARD ─────────────────────────────────────────────────────────────
+const LEFT_OUTLET_IDS  = new Set(SOURCES.left.map(s => s.id));
+const RIGHT_OUTLET_IDS = new Set(SOURCES.right.map(s => s.id));
+
+function fetchLeaderboard() {
+  fetch(SHEETS_ENDPOINT + '?action=leaderboard')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error);
+      renderLeaderboard(data);
+    })
+    .catch(err => {
+      document.getElementById('lb-loading').textContent = 'Scores unavailable — check back soon.';
+      console.warn('Leaderboard fetch error:', err);
+    });
+}
+
+function renderLeaderboard(data) {
+  const { leaderboard, totalPairs, totalVotesCast, generated } = data;
+
+  // Split into left / right based on SOURCES config
+  const leftRows  = leaderboard.filter(r => LEFT_OUTLET_IDS.has(r.outlet));
+  const rightRows = leaderboard.filter(r => RIGHT_OUTLET_IDS.has(r.outlet));
+
+  // Meta bar
+  const genDate = generated ? new Date(generated).toLocaleString() : '';
+  document.getElementById('lb-meta').innerHTML =
+    `<span>${totalPairs} pair${totalPairs !== 1 ? 's' : ''} scored · ${totalVotesCast} total votes</span>` +
+    `<span>Updated ${genDate}</span>`;
+
+  // Render each side
+  renderLbSide('lb-left-rows',  leftRows);
+  renderLbSide('lb-right-rows', rightRows);
+
+  document.getElementById('lb-loading').style.display = 'none';
+  document.getElementById('lb-content').style.display = 'block';
+
+  // Update subtitle
+  const top = leaderboard[0];
+  if (top && top.winRate !== null) {
+    document.getElementById('lb-subtitle').textContent =
+      `${top.outlet} leads · ${top.winRate}% win rate`;
+  }
+}
+
+function renderLbSide(containerId, rows) {
+  const el = document.getElementById(containerId);
+  if (!rows.length) {
+    el.innerHTML = '<div class="lb-no-data">No data yet</div>';
+    return;
+  }
+  const maxRate = Math.max(...rows.map(r => r.winRate ?? 0));
+  el.innerHTML = rows.map((r, i) => {
+    const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    const score     = r.winRate !== null ? r.winRate + '%' : 'N/A';
+    const barWidth  = r.winRate !== null ? Math.round((r.winRate / Math.max(maxRate, 1)) * 100) : 0;
+    const delay     = i * 60;
+    return `
+      <div class="lb-row" style="animation-delay:${delay}ms">
+        <span class="lb-rank ${rankClass}">${i + 1}</span>
+        <span class="lb-outlet" title="${r.outlet}">${r.outlet}</span>
+        <div class="lb-score-wrap">
+          <span class="lb-score">${score}</span>
+          <div class="lb-bar-bg">
+            <div class="lb-bar-fill" style="width:${barWidth}%"></div>
+          </div>
+          <span class="lb-appearances">${r.appearances} pair${r.appearances !== 1 ? 's' : ''}</span>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 // ─── GOOGLE SHEETS INTEGRATION ───────────────────────────────────────────────
