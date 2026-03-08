@@ -1219,12 +1219,17 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v29';
+  const CACHE_VERSION = 'v30';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
 function getCachedFeed() {
   try {
+    // Always purge stale cache versions on load — keeps localStorage clean
+    // and ensures deployed algorithm changes take effect immediately
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('newsbalance_feed_') && k !== todayKey())
+      .forEach(k => localStorage.removeItem(k));
     const raw = localStorage.getItem(todayKey());
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
