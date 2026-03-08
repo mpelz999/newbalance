@@ -937,7 +937,7 @@ const PERMANENT_CLUSTERS = [
   { label: 'Vaccines / Public Health', keys: ['vaccine', 'vaccination', 'measles', 'mmr', 'herd immunity', 'childhood.*shot', 'fda.*drug', 'cdc.*recommend', 'vinay prasad', 'immuniz', 'antivax', 'anti-vax', 'booster.*dose', 'rfk.*vaccine', 'kennedy.*vaccine'] },
   { label: 'Abortion / Reproductive', keys: ['abortion', 'roe.*wade', 'reproductive.*right', 'pro-life', 'pro-choice', 'planned parenthood', 'fetal', 'dobbs'] },
   { label: 'Gun Policy',              keys: ['gun.*control', 'gun.*right', 'second amendment', 'firearm.*law', 'assault.*weapon', 'background check', 'gun.*legislation'] },
-  { label: 'Climate / Energy',        keys: ['climate change', 'global warming', 'fossil fuel', 'renewable energy', 'carbon emission', 'green new deal', 'paris.*accord', 'epa.*rule'] },
+  { label: 'Climate / Energy',        keys: ['climate change', 'global warming', 'fossil fuel', 'renewable energy', 'carbon emission', 'green new deal', 'paris.*accord', '\\bepa\\b.*rule'] },
   { label: 'Economy / Tariffs',       keys: ['tariff', 'trade war', 'inflation', 'federal reserve', 'interest rate', 'recession', 'gdp', 'unemployment', 'stock market', 'trade deficit'] },
   { label: 'Supreme Court',           keys: ['scotus', 'u\.s\. supreme court', 'u\.s\..*supreme court', 'federal.*supreme court', 'high court.*ruling', 'justices.*ruled', 'gorsuch', 'sotomayor', 'alito', 'kavanaugh', 'barrett', 'roberts.*chief', 'jackson.*justice.*court', 'supreme court.*9.*justices', 'nation.*highest court'] },
   { label: 'Healthcare / Medicare',   keys: ['medicaid', 'medicare', 'affordable care', 'obamacare', 'health insurance', 'prescription drug', 'medical debt'] },
@@ -1196,6 +1196,19 @@ function matchScore(a, b) {
     return 0;
   }
 
+  // Reject wire-service duplicates: titles sharing >75% of meaningful words = same story
+  const titleWords = t => new Set(t.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 3));
+  const aTW = titleWords(a.title || ''), bTW = titleWords(b.title || '');
+  if (aTW.size > 0 && bTW.size > 0) {
+    let shared = 0;
+    for (const w of aTW) { if (bTW.has(w)) shared++; }
+    const similarity = shared / Math.min(aTW.size, bTW.size);
+    if (similarity >= 0.75) {
+      PairingDebugger.logRejection(a, b, 'DUPLICATE TITLE: similarity=' + similarity.toFixed(2), {});
+      return 0;
+    }
+  }
+
   const overlap = keywordOverlapScore(a, b);
   const nonPersonOverlap = keywordOverlapNonPerson(a, b);
 
@@ -1312,7 +1325,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v38';
+  const CACHE_VERSION = 'v39';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
