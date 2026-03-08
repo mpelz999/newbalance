@@ -1219,7 +1219,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v28';
+  const CACHE_VERSION = 'v29';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1470,9 +1470,9 @@ function buildPairs(leftArticles, rightArticles) {
     const cleanTitle = (a.title || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
     const cleanDesc  = desc.replace(/[^a-z0-9\s]/g, '').trim();
     if (cleanDesc && cleanDesc === cleanTitle) return true;
-    if (cleanDesc && cleanTitle.includes(cleanDesc) && cleanDesc.length < 80) return true;
-    // Live blog / rolling updates — these are catch-all articles that match everything
-    if (/^live(\s+updates?)?:|live blog/i.test(a.title || '')) return true;
+    if (cleanDesc && cleanTitle.includes(cleanDesc) && cleanDesc.length < 40) return true;
+    // Only block generic "LIVE:" not topic-specific live updates like "Iran live updates:"
+    if (/^live\s*:/i.test(a.title || '') || /^live blog/i.test(a.title || '')) return true;
     return false;
   };
 
