@@ -177,7 +177,8 @@ function parseRSS(xml, sourceName) {
     if (!url) continue;
     // Skip video shorts and thin content — these make poor news pairs
     if (/^watch:?\s/i.test(title)) continue;
-    if (/^live(\s+updates?)?:/i.test(title)) continue;
+    // Only block generic "LIVE:" or "LIVE BLOG:" not topic-specific live updates like "Iran live updates:"
+    if (/^live\s*:/i.test(title) || /^live blog/i.test(title)) continue;
     const cleanedDesc = description?.replace(/[^a-z0-9\s]/gi, '').trim().toLowerCase() || '';
     const cleanedTitle = title.replace(/[^a-z0-9\s]/gi, '').trim().toLowerCase();
     if (cleanedDesc && cleanedDesc === cleanedTitle) continue; // desc just repeats title
