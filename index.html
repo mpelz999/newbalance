@@ -832,7 +832,7 @@ const SOURCES = {
 // Order matters: more specific clusters listed first to prevent wrong matches.
 const PERMANENT_CLUSTERS = [
   // ── Foreign policy / conflicts ─────────────────────────────────────────────
-  { label: 'Iran / Middle East War',  keys: ['iran', 'khamenei', 'ayatollah', 'tehran', 'iranian', 'operation epic fury', 'strait.*hormuz', 'persian gulf.*strike'] },
+  { label: 'Iran / Middle East War',  keys: ['iran', 'khamenei', 'ayatollah', 'tehran', 'iranian', 'operation epic fury', 'strait.*hormuz', 'persian gulf.*strike', 'dignified transfer', 'dover air force', 'kuwait.*drone', 'killed in kuwait'] },
   { label: 'Ukraine / Russia',        keys: ['ukraine', 'zelensky', 'russian.*troops', 'nato.*russia', 'kyiv', 'putin.*ukraine', 'war.*ukraine'] },
   { label: 'Israel / Gaza',           keys: ['gaza', 'hamas', 'west bank', 'palestin', 'idf', 'netanyahu.*gaza', 'ceasefire.*gaza', 'occupied territory'] },
   { label: 'China / Taiwan',          keys: ['taiwan.*china', 'china.*taiwan', 'south china sea', 'xi jinping', 'beijing.*taiwan', 'pla.*taiwan'] },
@@ -1002,7 +1002,13 @@ function initClusters(leftArticles, rightArticles) {
 
 function classifyArticle(article) {
   const text = ((article.title || '') + ' ' + (article.description || '')).toLowerCase();
-  for (const cluster of _allClusters) {
+  // Check permanent clusters first for high-priority topics — prevents dynamic
+  // clusters from stealing articles that belong to a known permanent cluster.
+  for (const cluster of PERMANENT_CLUSTERS) {
+    if (cluster.keys.some(k => new RegExp(k).test(text))) return cluster.label;
+  }
+  // Then check dynamic clusters for breaking news not covered by permanent clusters
+  for (const cluster of _dynamicClusters) {
     if (cluster.keys.some(k => new RegExp(k).test(text))) return cluster.label;
   }
   return null;
@@ -1213,7 +1219,7 @@ async function fetchAggregates() {
 function todayKey() {
   // Version suffix forces cache bust when pairing logic changes.
   // Increment CACHE_VERSION whenever algorithm updates are deployed.
-  const CACHE_VERSION = 'v22';
+  const CACHE_VERSION = 'v25';
   return 'newsbalance_feed_' + new Date().toISOString().slice(0, 10) + '_' + CACHE_VERSION;
 }
 
@@ -1471,7 +1477,7 @@ function buildPairs(leftArticles, rightArticles) {
     return SPORTS_TERMS.some(t => text.includes(t));
   };
   // Only include articles that can be classified — unclassified articles make bad pairs
-  const hasMinDesc = a => (a.description || '').trim().length >= 80;
+  const hasMinDesc = a => (a.description || '').trim().length >= 40;
   const leftPool  = leftArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a) && hasMinDesc(a));
   const rightPool = rightArticles.filter(a => a.title && a.title !== '[Removed]' && isValidImage(a.urlToImage) && classifyArticle(a) && !isDigest(a) && !isSports(a) && hasMinDesc(a));
 
