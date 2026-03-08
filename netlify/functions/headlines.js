@@ -175,6 +175,12 @@ function parseRSS(xml, sourceName) {
 
     if (!title || title === '[Removed]' || title.length < 10) continue;
     if (!url) continue;
+    // Skip video shorts and thin content — these make poor news pairs
+    if (/^watch:?\s/i.test(title)) continue;
+    if (/^live(\s+updates?)?:/i.test(title)) continue;
+    const cleanedDesc = description?.replace(/[^a-z0-9\s]/gi, '').trim().toLowerCase() || '';
+    const cleanedTitle = title.replace(/[^a-z0-9\s]/gi, '').trim().toLowerCase();
+    if (cleanedDesc && cleanedDesc === cleanedTitle) continue; // desc just repeats title
 
     articles.push({
       title,
